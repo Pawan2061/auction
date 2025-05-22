@@ -10,6 +10,10 @@ class Auction extends Model {
   public duration!: number;
   public status!: "active" | "ended" | "closed";
   public highestBidId?: string | null;
+  public userId!: string;
+  public createdAt!: Date;
+  public updatedAt!: Date;
+  public endTime!: Date;
 }
 
 Auction.init(
@@ -34,6 +38,7 @@ Auction.init(
     duration: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      comment: "Duration in minutes",
     },
     status: {
       type: DataTypes.ENUM("active", "ended", "closed"),
@@ -43,12 +48,22 @@ Auction.init(
       type: DataTypes.UUID,
       allowNull: true,
     },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
   },
   {
     sequelize,
     modelName: "Auction",
     tableName: "auctions",
     timestamps: true,
+    hooks: {
+      beforeCreate: (auction: Auction) => {
+        const now = new Date();
+        auction.endTime = new Date(now.getTime() + auction.duration * 60000);
+      },
+    },
   }
 );
 

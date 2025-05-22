@@ -1,4 +1,3 @@
-// src/models/bid.ts
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../db/seq";
 import User from "./user";
@@ -9,6 +8,8 @@ class Bid extends Model {
   public amount!: number;
   public auctionId!: string;
   public userId!: string;
+  public createdAt!: Date;
+  public updatedAt!: Date;
 }
 
 Bid.init(
@@ -21,6 +22,22 @@ Bid.init(
     amount: {
       type: DataTypes.FLOAT,
       allowNull: false,
+    },
+    auctionId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: Auction,
+        key: "id",
+      },
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: User,
+        key: "id",
+      },
     },
   },
   {
