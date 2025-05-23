@@ -1,5 +1,6 @@
 import express from "express";
 import { createAuction, getAuction, getAuctions } from "../controller/auction";
+import { authenticateToken } from "../middlewares/jwt";
 
 export const auctionRouter = express.Router();
 

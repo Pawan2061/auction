@@ -13,17 +13,23 @@ app.use(express.json());
 app.use("/api/v1/auction", auctionRouter);
 app.use("/api/v1/bid", bidRouter);
 app.use("/api/v1/auth", authRouter);
-
 app.listen(3000, async () => {
+  console.log("Starting server on port 3000...");
+
   try {
     await sequelize.authenticate();
-    console.log("Database connected");
+    console.log("✅ Connected to Supabase PostgreSQL");
 
-    await sequelize.sync({ alter: true });
-    console.log("Models synced");
+    // if (process.env.NODE_ENV !== "production") {
+    //   await sequelize.sync({ alter: true });
+    //   console.log("✅ Database models synced (development mode)");
+    // } else {
+    //   console.log("ℹ️ Skipping sync in production mode");
+    // }
+
+    console.log("🚀 Server running on http://localhost:3000");
   } catch (err) {
-    console.error("Error:", err);
+    console.error("❌ Database connection/sync error:", err);
+    process.exit(1);
   }
-
-  console.log("Server running on port 3000");
 });

@@ -1,10 +1,20 @@
-// src/db/seq.ts
 import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
 
-export const sequelize = new Sequelize(
-  "postgresql://postgres:Kr@ken2128@db.llmxqwikhthywcpyhahq.supabase.co:5432/postgres",
-  {
-    dialect: "postgres",
-    logging: false,
-  }
-);
+dotenv.config();
+
+export const sequelize = new Sequelize(process.env.SUPABASE_URL!, {
+  dialect: "postgres",
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+    },
+  },
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  },
+});

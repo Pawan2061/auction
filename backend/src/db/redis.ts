@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const client = createClient({
-  url: process.env.REDIS_URL,
+  url: "redis://localhost:6379",
 });
 
 client.on("error", (err) => {
