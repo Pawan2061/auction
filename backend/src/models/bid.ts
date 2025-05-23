@@ -3,14 +3,25 @@ import { sequelize } from "../db/seq";
 import User from "./user";
 import Auction from "./auction";
 
+export enum BidStatus {
+  PENDING = "pending",
+  ACCEPTED = "accepted",
+  REJECTED = "rejected",
+}
+
 class Bid extends Model {
   public id!: string;
   public amount!: number;
   public auctionId!: string;
   public userId!: string;
+  public status!: BidStatus;
+  public acceptedAt!: Date | null;
+  public rejectedAt!: Date | null;
   public createdAt!: Date;
   public updatedAt!: Date;
-  public bidder!: string;
+
+  public bidder?: User;
+  public auction?: Auction;
 }
 
 Bid.init(
@@ -39,6 +50,19 @@ Bid.init(
         model: User,
         key: "id",
       },
+    },
+    status: {
+      type: DataTypes.ENUM(...Object.values(BidStatus)),
+      allowNull: false,
+      defaultValue: BidStatus.PENDING,
+    },
+    acceptedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    rejectedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {

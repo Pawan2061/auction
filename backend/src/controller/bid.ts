@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Server } from "socket.io";
-import Bid from "../models/bid";
+import Bid, { BidStatus } from "../models/bid";
 import Auction from "../models/auction";
 import User from "../models/user";
 import { AuctionService } from "../utils/auctionService";
@@ -52,20 +52,17 @@ export const placeBid = async (req: AuthRequest, res: any) => {
         .json({ error: "You cannot bid on your own auction" });
     }
 
-    // Create the bid
     const bid = await Bid.create({
       amount,
       auctionId,
       userId,
+      status: BidStatus.PENDING,
     });
 
-    // Update highest bid in cache/service
     await AuctionService.setHighestBid(auctionId, amount, bid.id);
 
-    // Update auction with highest bid
     await auction.update({ highestBidId: bid.id });
 
-    // Fetch the bid with user information
     const bidWithUser = await Bid.findByPk(bid.id, {
       include: [
         {
@@ -76,11 +73,9 @@ export const placeBid = async (req: AuthRequest, res: any) => {
       ],
     });
 
-    // Enhanced socket emission with more comprehensive data
     if (io) {
       console.log(`Emitting newBid event to auction_${auctionId}`);
 
-      // Emit to the specific auction room
       io.to(`auction_${auctionId}`).emit("newBid", {
         bid: bidWithUser,
         currentPrice: amount,
@@ -90,7 +85,6 @@ export const placeBid = async (req: AuthRequest, res: any) => {
         bidCount: await Bid.count({ where: { auctionId } }),
       });
 
-      // Also emit a general bid update for dashboard/notifications
       io.emit("bidUpdate", {
         auctionId,
         currentPrice: amount,
@@ -98,7 +92,6 @@ export const placeBid = async (req: AuthRequest, res: any) => {
         timestamp: new Date().toISOString(),
       });
 
-      // Log active connections for debugging
       const room = io.sockets.adapter.rooms.get(`auction_${auctionId}`);
       console.log(
         `Active connections in auction_${auctionId}:`,
@@ -117,7 +110,6 @@ export const placeBid = async (req: AuthRequest, res: any) => {
   } catch (error) {
     console.error("Place bid error:", error);
 
-    // Emit error to socket if available
     if (io && req.body.auctionId) {
       io.to(`auction_${req.body.auctionId}`).emit("bidError", {
         error: "Failed to place bid",
@@ -126,6 +118,234 @@ export const placeBid = async (req: AuthRequest, res: any) => {
       });
     }
 
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const acceptBid = async (req: AuthRequest, res: any) => {
+  try {
+    const { bidId } = req.params;
+    const userId = req.userId!;
+
+    if (!bidId) {
+      return res.status(400).json({ error: "Bid ID is required" });
+    }
+
+    const bid = await Bid.findByPk(bidId, {
+      include: [
+        {
+          model: Auction,
+          as: "auction",
+          attributes: ["id", "userId", "endTime", "title"],
+        },
+        {
+          model: User,
+          as: "bidder",
+          attributes: ["id", "username"],
+        },
+      ],
+    });
+
+    if (!bid) {
+      return res.status(404).json({ error: "Bid not found" });
+    }
+
+    if (bid.auction?.userId !== userId) {
+      return res.status(403).json({
+        error: "Only the auction owner can accept bids",
+      });
+    }
+    if (bid.status !== BidStatus.PENDING) {
+      return res.status(400).json({
+        error: `Bid has already been ${bid.status}`,
+      });
+    }
+
+    const isActive = await AuctionService.isAuctionActive(bid.auctionId);
+    if (!isActive) {
+      return res.status(400).json({
+        error: "Cannot accept bids on inactive or ended auctions",
+      });
+    }
+
+    await bid.update({
+      status: BidStatus.ACCEPTED,
+      acceptedAt: new Date(),
+    });
+
+    await Bid.update(
+      {
+        status: BidStatus.REJECTED,
+        rejectedAt: new Date(),
+      },
+      {
+        where: {
+          auctionId: bid.auctionId,
+          id: { [require("sequelize").Op.ne]: bidId },
+          status: BidStatus.PENDING,
+        },
+      }
+    );
+
+    await Auction.update(
+      { endTime: new Date() },
+      { where: { id: bid.auctionId } }
+    );
+
+    if (io) {
+      console.log(`Emitting bidAccepted event to auction_${bid.auctionId}`);
+
+      io.to(`auction_${bid.auctionId}`).emit("bidAccepted", {
+        bid: {
+          ...bid.toJSON(),
+          bidder: bid.bidder,
+          auction: bid.auction,
+        },
+        message: "Bid has been accepted! Auction ended.",
+        timestamp: new Date().toISOString(),
+        auctionEnded: true,
+      });
+
+      io.emit("auctionEnded", {
+        auctionId: bid.auctionId,
+        winningBid: bid.amount,
+        winner: bid.bidder,
+        auctionTitle: bid.auction?.name,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.json({
+      message: "Bid accepted successfully",
+      bid: {
+        ...bid.toJSON(),
+        bidder: bid.bidder,
+        auction: bid.auction,
+      },
+      auctionEnded: true,
+    });
+  } catch (error) {
+    console.error("Accept bid error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const rejectBid = async (req: AuthRequest, res: any) => {
+  try {
+    const { bidId } = req.params;
+    const userId = req.userId!;
+
+    if (!bidId) {
+      return res.status(400).json({ error: "Bid ID is required" });
+    }
+
+    const bid = await Bid.findByPk(bidId, {
+      include: [
+        {
+          model: Auction,
+          as: "auction",
+          attributes: ["id", "userId", "endTime", "title"],
+        },
+        {
+          model: User,
+          as: "bidder",
+          attributes: ["id", "username"],
+        },
+      ],
+    });
+
+    if (!bid) {
+      return res.status(404).json({ error: "Bid not found" });
+    }
+
+    if (bid.auction?.userId !== userId) {
+      return res.status(403).json({
+        error: "Only the auction owner can reject bids",
+      });
+    }
+
+    if (bid.status !== BidStatus.PENDING) {
+      return res.status(400).json({
+        error: `Bid has already been ${bid.status}`,
+      });
+    }
+
+    const isActive = await AuctionService.isAuctionActive(bid.auctionId);
+    if (!isActive) {
+      return res.status(400).json({
+        error: "Cannot reject bids on inactive or ended auctions",
+      });
+    }
+
+    await bid.update({
+      status: BidStatus.REJECTED,
+      rejectedAt: new Date(),
+    });
+
+    const nextHighestBid = await Bid.findOne({
+      where: {
+        auctionId: bid.auctionId,
+        status: BidStatus.PENDING,
+      },
+      order: [["amount", "DESC"]],
+    });
+
+    if (nextHighestBid) {
+      await Auction.update(
+        { highestBidId: nextHighestBid.id },
+        { where: { id: bid.auctionId } }
+      );
+      await AuctionService.setHighestBid(
+        bid.auctionId,
+        nextHighestBid.amount,
+        nextHighestBid.id
+      );
+    } else {
+      const auction = await Auction.findByPk(bid.auctionId);
+      if (auction) {
+        await auction.update({ highestBidId: null });
+        await AuctionService.setHighestBid(
+          bid.auctionId,
+          auction.startingPrice,
+          ""
+        );
+      }
+    }
+
+    if (io) {
+      console.log(`Emitting bidRejected event to auction_${bid.auctionId}`);
+
+      io.to(`auction_${bid.auctionId}`).emit("bidRejected", {
+        bid: {
+          ...bid.toJSON(),
+          bidder: bid.bidder,
+          auction: bid.auction,
+        },
+        message: "Bid has been rejected",
+        timestamp: new Date().toISOString(),
+        newHighestBid:
+          nextHighestBid?.amount || bid.auction?.startingPrice || 0,
+      });
+
+      io.to(`auction_${bid.auctionId}`).emit("priceUpdate", {
+        auctionId: bid.auctionId,
+        currentPrice: nextHighestBid?.amount || bid.auction?.startingPrice || 0,
+        highestBidId: nextHighestBid?.id || null,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.json({
+      message: "Bid rejected successfully",
+      bid: {
+        ...bid.toJSON(),
+        bidder: bid.bidder,
+        auction: bid.auction,
+      },
+      newHighestBid: nextHighestBid?.amount || bid.auction?.startingPrice || 0,
+    });
+  } catch (error) {
+    console.error("Reject bid error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -146,13 +366,30 @@ export const getAuctionBids = async (req: Request, res: Response) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // Get current highest bid for additional context
     const currentHighestBid = await AuctionService.getHighestBid(auctionId);
+
+    const pendingBids = bids.filter((bid) => bid.status === BidStatus.PENDING);
+    const acceptedBids = bids.filter(
+      (bid) => bid.status === BidStatus.ACCEPTED
+    );
+    const rejectedBids = bids.filter(
+      (bid) => bid.status === BidStatus.REJECTED
+    );
 
     res.json({
       bids,
       currentHighestBid,
       totalBids: bids.length,
+      bidsByStatus: {
+        pending: pendingBids,
+        accepted: acceptedBids,
+        rejected: rejectedBids,
+      },
+      statusCounts: {
+        pending: pendingBids.length,
+        accepted: acceptedBids.length,
+        rejected: rejectedBids.length,
+      },
     });
   } catch (error) {
     console.error("Get auction bids error:", error);
@@ -160,7 +397,6 @@ export const getAuctionBids = async (req: Request, res: Response) => {
   }
 };
 
-// Additional helper function to join auction room
 export const joinAuctionRoom = (req: AuthRequest, res: Response) => {
   try {
     const { auctionId } = req.params;
@@ -170,8 +406,6 @@ export const joinAuctionRoom = (req: AuthRequest, res: Response) => {
       return res.status(500).json({ error: "Socket.IO not initialized" });
     }
 
-    // This would typically be handled in socket connection event
-    // But providing endpoint for manual room joining if needed
     res.json({
       message: `Ready to join auction room: auction_${auctionId}`,
       roomName: `auction_${auctionId}`,
