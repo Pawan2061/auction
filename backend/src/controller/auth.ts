@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/user";
+import { Op } from "sequelize";
 
 export const register = async (req: Request, res: any) => {
   try {
@@ -13,7 +14,7 @@ export const register = async (req: Request, res: any) => {
 
     const existingUser = await User.findOne({
       where: {
-        $or: [{ email }, { username }],
+        [Op.or]: [{ email }, { username }],
       },
     });
 
@@ -57,6 +58,8 @@ export const login = async (req: Request, res: any) => {
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
+    console.log(isValidPassword);
+
     if (!isValidPassword) {
       return res.status(400).json({ error: "Invalid credentials" });
     }

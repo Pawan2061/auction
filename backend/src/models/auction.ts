@@ -52,6 +52,10 @@ Auction.init(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    endTime: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
   },
   {
     sequelize,
@@ -61,6 +65,7 @@ Auction.init(
     hooks: {
       beforeCreate: (auction: Auction) => {
         const now = new Date();
+
         auction.endTime = new Date(now.getTime() + auction.duration * 60000);
       },
     },

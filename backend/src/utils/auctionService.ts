@@ -79,11 +79,15 @@ export class AuctionService {
           },
         ],
       });
+      console.log(auction, "auction is here");
 
       if (!auction) return null;
 
       const highestBid = await this.getHighestBid(auctionId);
+      console.log(highestBid, "highest bid is here");
+
       const currentPrice = highestBid || auction.startingPrice;
+      console.log(auction.endTime, "is here also");
 
       return {
         ...auction.toJSON(),

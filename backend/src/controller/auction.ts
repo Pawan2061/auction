@@ -16,6 +16,10 @@ export const createAuction = async (req: AuthRequest, res: any) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    const now = new Date();
+    const endTime = new Date(now.getTime() + duration * 60000);
+    console.log(endTime, "okay done");
+
     if (startingPrice <= 0 || duration <= 0) {
       return res
         .status(400)
@@ -28,11 +32,13 @@ export const createAuction = async (req: AuthRequest, res: any) => {
       startingPrice,
       duration,
       userId,
+      endTime,
     });
 
     const auctionWithDetails = await AuctionService.getAuctionWithDetails(
       auction.id
     );
+    console.log(auctionWithDetails, "deatials here");
 
     res.status(201).json({
       message: "Auction created successfully",
@@ -46,6 +52,8 @@ export const createAuction = async (req: AuthRequest, res: any) => {
 
 export const getAuctions = async (req: Request, res: any) => {
   try {
+    console.log("inside this");
+
     const auctions = await Auction.findAll({
       include: [
         {
@@ -56,15 +64,20 @@ export const getAuctions = async (req: Request, res: any) => {
       ],
       order: [["createdAt", "DESC"]],
     });
+    console.log(auctions, "will be here");
 
     const auctionsWithDetails = await Promise.all(
       auctions.map(async (auction) => {
         const highestBid = await AuctionService.getHighestBid(auction.id);
+        console.log(highestBid, "okay bid here");
+
         const currentPrice = highestBid || auction.startingPrice;
+
         const timeRemaining = Math.max(
           0,
           auction.endTime.getTime() - Date.now()
         );
+        console.log(timeRemaining, "okay remaning time here");
 
         return {
           ...auction.toJSON(),
@@ -84,6 +97,8 @@ export const getAuctions = async (req: Request, res: any) => {
 export const getAuction = async (req: Request, res: any) => {
   try {
     const { id } = req.params;
+    console.log(id, "id is here");
+
     const auction = await AuctionService.getAuctionWithDetails(id);
 
     if (!auction) {

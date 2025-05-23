@@ -7,6 +7,7 @@ import "./models/bid";
 import { auctionRouter } from "./routes/auction";
 import { bidRouter } from "./routes/bid";
 import { authRouter } from "./routes/auth";
+import { connectRedis } from "./db/redis";
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ app.listen(3000, async () => {
 
   try {
     await sequelize.authenticate();
+    connectRedis();
     console.log("✅ Connected to Supabase PostgreSQL");
 
     // if (process.env.NODE_ENV !== "production") {

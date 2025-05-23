@@ -4,7 +4,7 @@ import { authenticateToken } from "../middlewares/jwt";
 
 export const auctionRouter = express.Router();
 
-auctionRouter.post("/", createAuction);
-auctionRouter.post("/:id", getAuction);
+auctionRouter.post("/", authenticateToken, createAuction);
+auctionRouter.get("/all", getAuctions);
 
-auctionRouter.post("/all", getAuctions);
+auctionRouter.get("/:id", getAuction);
