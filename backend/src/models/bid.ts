@@ -10,6 +10,7 @@ class Bid extends Model {
   public userId!: string;
   public createdAt!: Date;
   public updatedAt!: Date;
+  public bidder!: string;
 }
 
 Bid.init(
