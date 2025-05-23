@@ -140,7 +140,7 @@ const AuctionLanding = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 text-slate-800 overflow-hidden">
+    <div className=" bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 text-slate-800 overflow-hidden">
       {/* Notifications */}
       <AnimatePresence>
         {notifications.map((notification) => (
@@ -199,7 +199,7 @@ const AuctionLanding = () => {
       </div>
 
       {/* Navigation */}
-      <motion.nav
+      {/* <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className="relative z-50 flex items-center justify-between p-6 lg:px-12 bg-white/80 backdrop-blur-md border-b border-slate-200/50"
@@ -233,9 +233,8 @@ const AuctionLanding = () => {
             Sign In
           </Button>
         </div>
-      </motion.nav>
+      </motion.nav> */}
 
-      {/* Hero Section */}
       <motion.section
         variants={containerVariants}
         initial="hidden"
