@@ -9,8 +9,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import axios from "axios";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useMutation } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -34,7 +47,13 @@ import {
   Trophy,
   Menu,
   X,
+  LogOut,
+  Settings,
+  CreditCard,
+  Bell,
+  ChevronDown,
 } from "lucide-react";
+import { useUserStore } from "@/store/user";
 
 interface FormData {
   email: string;
@@ -43,12 +62,29 @@ interface FormData {
   name?: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  username: string;
+  password?: string;
+}
+
+interface UserStore {
+  user: User | null;
+  isAuthenticated: boolean;
+  setUser: (user: User) => void;
+  clearUser: () => void;
+}
+
 const Navbar = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Zustand store
+  const { user, isAuthenticated, setUser, clearUser } = useUserStore();
 
   const [loginData, setLoginData] = useState<FormData>({
     email: "",
@@ -59,7 +95,6 @@ const Navbar = () => {
     name: "",
     email: "",
     password: "",
-    confirmPassword: "",
   });
 
   const navLinks = [
@@ -67,22 +102,79 @@ const Navbar = () => {
     { href: "/your-bids", label: "Your Bids", icon: Trophy, badge: "3" },
   ];
 
-  const handleLogin = async () => {
+  const loginMutation = useMutation({
+    mutationFn: (data: FormData) =>
+      axios.post("http://localhost:3000/api/v1/auth/login", data),
+    onSuccess: (res) => {
+      console.log("Login Success:", res.data);
+      // Set user using Zustand store
+      setUser({
+        username: res.data.user.username,
+        id: res.data.user.id,
+        email: res.data.user.email,
+      });
+      setIsAuthModalOpen(false);
+      setLoginData({ email: "", password: "" });
+    },
+    onError: (err) => {
+      console.error("Login Error:", err);
+    },
+  });
+
+  const handleLogin = () => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
     console.log("Login data:", loginData);
-    setIsLoading(false);
-    setIsAuthModalOpen(false);
-    setLoginData({ email: "", password: "" });
+    loginMutation.mutate(loginData, {
+      onSettled: () => setIsLoading(false),
+    });
   };
 
-  const handleSignup = async () => {
+  const signupMutation = useMutation({
+    mutationFn: (data: FormData) =>
+      axios.post("http://localhost:3000/api/v1/auth/signup", {
+        username: data.name,
+        email: data.email,
+        password: data.password,
+      }),
+    onSuccess: (res) => {
+      console.log("Signup Success:", res.data);
+      // Set user using Zustand store
+      setUser({
+        username: res.data.user.username,
+        id: res.data.user.id,
+        email: res.data.user.email,
+      });
+      setIsAuthModalOpen(false);
+      setSignupData({ name: "", email: "", password: "", confirmPassword: "" });
+    },
+    onError: (err) => {
+      console.error("Signup Error:", err);
+    },
+  });
+
+  const handleSignup = () => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
     console.log("Signup data:", signupData);
-    setIsLoading(false);
-    setIsAuthModalOpen(false);
+    signupMutation.mutate(signupData, {
+      onSettled: () => setIsLoading(false),
+    });
+  };
+
+  const handleLogout = () => {
+    clearUser();
+    setLoginData({ email: "", password: "" });
     setSignupData({ name: "", email: "", password: "", confirmPassword: "" });
+    console.log("User logged out");
+    // axios.post("http://localhost:3000/api/v1/auth/logout");
+  };
+
+  const getInitials = (username: string) => {
+    return username
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const isLoginValid = loginData.email && loginData.password;
@@ -151,291 +243,361 @@ const Navbar = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              <Dialog open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen}>
-                <DialogTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="outline"
-                      className="hidden sm:flex items-center space-x-2 border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-200"
+              {isAuthenticated && user ? (
+                // User Profile Dropdown
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-slate-100/80 transition-all duration-200 border border-slate-200"
                     >
-                      <LogIn className="w-4 h-4" />
-                      <span>Sign In</span>
-                    </Button>
-                  </motion.div>
-                </DialogTrigger>
-
-                <DialogContent className="sm:max-w-md border-0 shadow-2xl">
-                  <Tabs defaultValue="login" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 mb-6">
-                      <TabsTrigger
-                        value="login"
-                        className="flex items-center space-x-2"
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src="" alt={user.username} />
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-semibold">
+                          {getInitials(user.username)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="hidden sm:block text-left">
+                        <p className="text-sm font-medium text-slate-900">
+                          {user.username}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate max-w-32">
+                          {user.email}
+                        </p>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    </motion.button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 shadow-xl">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {user.username}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Billing</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Bell className="mr-2 h-4 w-4" />
+                      <span>Notifications</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-600 focus:text-red-600"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                // Sign In Modal
+                <Dialog
+                  open={isAuthModalOpen}
+                  onOpenChange={setIsAuthModalOpen}
+                >
+                  <DialogTrigger asChild>
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        variant="outline"
+                        className="hidden sm:flex items-center space-x-2 border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-200"
                       >
                         <LogIn className="w-4 h-4" />
-                        <span>Login</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="signup"
-                        className="flex items-center space-x-2"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>Sign Up</span>
-                      </TabsTrigger>
-                    </TabsList>
+                        <span>Sign In</span>
+                      </Button>
+                    </motion.div>
+                  </DialogTrigger>
 
-                    <TabsContent value="login" className="space-y-4">
-                      <DialogHeader>
-                        <DialogTitle className="text-center text-xl font-bold">
-                          Welcome Back
-                        </DialogTitle>
-                        <DialogDescription className="text-center">
-                          Sign in to your account to continue bidding
-                        </DialogDescription>
-                      </DialogHeader>
+                  <DialogContent className="sm:max-w-md border-0 shadow-2xl">
+                    <Tabs defaultValue="login" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 mb-6">
+                        <TabsTrigger
+                          value="login"
+                          className="flex items-center space-x-2"
+                        >
+                          <LogIn className="w-4 h-4" />
+                          <span>Login</span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="signup"
+                          className="flex items-center space-x-2"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          <span>Sign Up</span>
+                        </TabsTrigger>
+                      </TabsList>
 
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="login-email"
-                            className="flex items-center space-x-2"
-                          >
-                            <Mail className="w-4 h-4" />
-                            <span>Email</span>
-                          </Label>
-                          <Input
-                            id="login-email"
-                            type="email"
-                            placeholder="your@email.com"
-                            value={loginData.email}
-                            onChange={(e) =>
-                              setLoginData((prev) => ({
-                                ...prev,
-                                email: e.target.value,
-                              }))
-                            }
-                            className="h-11"
-                          />
-                        </div>
+                      <TabsContent value="login" className="space-y-4">
+                        <DialogHeader>
+                          <DialogTitle className="text-center text-xl font-bold">
+                            Welcome Back
+                          </DialogTitle>
+                          <DialogDescription className="text-center">
+                            Sign in to your account to continue bidding
+                          </DialogDescription>
+                        </DialogHeader>
 
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="login-password"
-                            className="flex items-center space-x-2"
-                          >
-                            <Lock className="w-4 h-4" />
-                            <span>Password</span>
-                          </Label>
-                          <div className="relative">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="login-email"
+                              className="flex items-center space-x-2"
+                            >
+                              <Mail className="w-4 h-4" />
+                              <span>Email</span>
+                            </Label>
                             <Input
-                              id="login-password"
-                              type={showPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              value={loginData.password}
+                              id="login-email"
+                              type="email"
+                              placeholder="your@email.com"
+                              value={loginData.email}
                               onChange={(e) =>
                                 setLoginData((prev) => ({
                                   ...prev,
-                                  password: e.target.value,
+                                  email: e.target.value,
                                 }))
                               }
-                              className="h-11 pr-10"
+                              className="h-11"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
                           </div>
-                        </div>
 
-                        <Button
-                          onClick={handleLogin}
-                          disabled={!isLoginValid || isLoading}
-                          className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50"
-                        >
-                          {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Signing In...</span>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="login-password"
+                              className="flex items-center space-x-2"
+                            >
+                              <Lock className="w-4 h-4" />
+                              <span>Password</span>
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="login-password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={loginData.password}
+                                onChange={(e) =>
+                                  setLoginData((prev) => ({
+                                    ...prev,
+                                    password: e.target.value,
+                                  }))
+                                }
+                                className="h-11 pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </button>
                             </div>
-                          ) : (
-                            <div className="flex items-center space-x-2">
-                              <LogIn className="w-4 h-4" />
-                              <span>Sign In</span>
-                            </div>
-                          )}
-                        </Button>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="signup" className="space-y-4">
-                      <DialogHeader>
-                        <DialogTitle className="text-center text-xl font-bold">
-                          Create Account
-                        </DialogTitle>
-                        <DialogDescription className="text-center">
-                          Join AuctionHub and start bidding today
-                        </DialogDescription>
-                      </DialogHeader>
-
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="signup-name"
-                            className="flex items-center space-x-2"
-                          >
-                            <User className="w-4 h-4" />
-                            <span>Full Name</span>
-                          </Label>
-                          <Input
-                            id="signup-name"
-                            placeholder="John Doe"
-                            value={signupData.name}
-                            onChange={(e) =>
-                              setSignupData((prev) => ({
-                                ...prev,
-                                name: e.target.value,
-                              }))
-                            }
-                            className="h-11"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="signup-email"
-                            className="flex items-center space-x-2"
-                          >
-                            <Mail className="w-4 h-4" />
-                            <span>Email</span>
-                          </Label>
-                          <Input
-                            id="signup-email"
-                            type="email"
-                            placeholder="your@email.com"
-                            value={signupData.email}
-                            onChange={(e) =>
-                              setSignupData((prev) => ({
-                                ...prev,
-                                email: e.target.value,
-                              }))
-                            }
-                            className="h-11"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="signup-password"
-                            className="flex items-center space-x-2"
-                          >
-                            <Lock className="w-4 h-4" />
-                            <span>Password</span>
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="signup-password"
-                              type={showPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              value={signupData.password}
-                              onChange={(e) =>
-                                setSignupData((prev) => ({
-                                  ...prev,
-                                  password: e.target.value,
-                                }))
-                              }
-                              className="h-11 pr-10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
                           </div>
-                        </div>
 
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="signup-confirm"
-                            className="flex items-center space-x-2"
+                          <Button
+                            onClick={handleLogin}
+                            disabled={!isLoginValid || isLoading}
+                            className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50"
                           >
-                            <Lock className="w-4 h-4" />
-                            <span>Confirm Password</span>
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="signup-confirm"
-                              type={showConfirmPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              value={signupData.confirmPassword}
-                              onChange={(e) =>
-                                setSignupData((prev) => ({
-                                  ...prev,
-                                  confirmPassword: e.target.value,
-                                }))
-                              }
-                              className="h-11 pr-10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowConfirmPassword(!showConfirmPassword)
-                              }
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                              {showConfirmPassword ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                          {signupData.password &&
-                            signupData.confirmPassword &&
-                            signupData.password !==
-                              signupData.confirmPassword && (
-                              <p className="text-red-500 text-sm">
-                                Passwords don't match
-                              </p>
+                            {isLoading ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Signing In...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <LogIn className="w-4 h-4" />
+                                <span>Sign In</span>
+                              </div>
                             )}
+                          </Button>
                         </div>
+                      </TabsContent>
 
-                        <Button
-                          onClick={handleSignup}
-                          disabled={!isSignupValid || isLoading}
-                          className="w-full h-11 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:opacity-50"
-                        >
-                          {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Creating Account...</span>
+                      <TabsContent value="signup" className="space-y-4">
+                        <DialogHeader>
+                          <DialogTitle className="text-center text-xl font-bold">
+                            Create Account
+                          </DialogTitle>
+                          <DialogDescription className="text-center">
+                            Join AuctionHub and start bidding today
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="signup-name"
+                              className="flex items-center space-x-2"
+                            >
+                              <User className="w-4 h-4" />
+                              <span>Full Name</span>
+                            </Label>
+                            <Input
+                              id="signup-name"
+                              placeholder="John Doe"
+                              value={signupData.name}
+                              onChange={(e) =>
+                                setSignupData((prev) => ({
+                                  ...prev,
+                                  name: e.target.value,
+                                }))
+                              }
+                              className="h-11"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="signup-email"
+                              className="flex items-center space-x-2"
+                            >
+                              <Mail className="w-4 h-4" />
+                              <span>Email</span>
+                            </Label>
+                            <Input
+                              id="signup-email"
+                              type="email"
+                              placeholder="your@email.com"
+                              value={signupData.email}
+                              onChange={(e) =>
+                                setSignupData((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                              className="h-11"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="signup-password"
+                              className="flex items-center space-x-2"
+                            >
+                              <Lock className="w-4 h-4" />
+                              <span>Password</span>
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="signup-password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={signupData.password}
+                                onChange={(e) =>
+                                  setSignupData((prev) => ({
+                                    ...prev,
+                                    password: e.target.value,
+                                  }))
+                                }
+                                className="h-11 pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </button>
                             </div>
-                          ) : (
-                            <div className="flex items-center space-x-2">
-                              <UserPlus className="w-4 h-4" />
-                              <span>Create Account</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="signup-confirm"
+                              className="flex items-center space-x-2"
+                            >
+                              <Lock className="w-4 h-4" />
+                              <span>Confirm Password</span>
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="signup-confirm"
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={signupData.confirmPassword}
+                                onChange={(e) =>
+                                  setSignupData((prev) => ({
+                                    ...prev,
+                                    confirmPassword: e.target.value,
+                                  }))
+                                }
+                                className="h-11 pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowConfirmPassword(!showConfirmPassword)
+                                }
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                              >
+                                {showConfirmPassword ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </button>
                             </div>
-                          )}
-                        </Button>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </DialogContent>
-              </Dialog>
+                            {signupData.password &&
+                              signupData.confirmPassword &&
+                              signupData.password !==
+                                signupData.confirmPassword && (
+                                <p className="text-red-500 text-sm">
+                                  Passwords don't match
+                                </p>
+                              )}
+                          </div>
+
+                          <Button
+                            onClick={handleSignup}
+                            disabled={!isSignupValid || isLoading}
+                            className="w-full h-11 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:opacity-50"
+                          >
+                            {isLoading ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Creating Account...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <UserPlus className="w-4 h-4" />
+                                <span>Create Account</span>
+                              </div>
+                            )}
+                          </Button>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </DialogContent>
+                </Dialog>
+              )}
 
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -486,17 +648,47 @@ const Navbar = () => {
                 ))}
 
                 <div className="pt-2 border-t border-slate-200">
-                  <Button
-                    onClick={() => {
-                      setIsAuthModalOpen(true);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    variant="outline"
-                    className="w-full justify-start space-x-2 border-2"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>Sign In</span>
-                  </Button>
+                  {isAuthenticated && user ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-50">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src="" alt={user.username} />
+                          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-semibold">
+                            {getInitials(user.username)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">
+                            {user.username}
+                          </p>
+                          <p className="text-xs text-slate-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          handleLogout();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        variant="outline"
+                        className="w-full justify-start space-x-2 border-2 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Log out</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        setIsAuthModalOpen(true);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      variant="outline"
+                      className="w-full justify-start space-x-2 border-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Sign In</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>
