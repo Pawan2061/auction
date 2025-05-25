@@ -30,6 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+
 import {
   Search,
   Filter,
@@ -43,6 +44,7 @@ import {
   Users,
   AlertCircle,
   Zap,
+  Radio,
 } from "lucide-react";
 import { useAuctionStore } from "@/store/auction";
 import { useUserStore } from "@/store/user";
@@ -50,6 +52,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
+import SocketStreamComponent from "@/components/stream-socket";
+import SocketStreamDialog from "@/components/stream-socket";
+import { useAcceptBid, useRejectBid } from "@/hooks/bid";
 
 interface Auction {
   id: string;
@@ -93,6 +98,15 @@ const ExploreAuctionsPage = () => {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [bidSubmitting, setBidSubmitting] = useState(false);
+  const { mutate: acceptBid, isPending: accepting } = useAcceptBid();
+  const { mutate: rejectBid, isPending: rejecting } = useRejectBid();
+  const handleAccept = () => {
+    toast.success("Bid placed successfully!");
+  };
+
+  const handleReject = () => {
+    toast.success("Bid rejected successfully");
+  };
 
   const { user } = useUserStore();
   const queryClient = useQueryClient();
@@ -358,6 +372,31 @@ const ExploreAuctionsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <SocketStreamDialog
+        socketUrl="http://localhost:3001"
+        userId={user?.id}
+        onBidUpdate={(update) => {
+          setAuctions((prevAuctions) =>
+            prevAuctions.map((auction) =>
+              auction.id === update.auctionId
+                ? {
+                    ...auction,
+                    currentPrice: update.currentPrice,
+                    currentBid: update.currentPrice,
+                    bidCount: update.bidCount,
+                  }
+                : auction
+            )
+          );
+        }}
+        enableSound={true}
+        trigger={
+          <Button variant="outline" className="flex items-center gap-2">
+            <Radio className="h-4 w-4" />
+            Live Stream
+          </Button>
+        }
+      />
       <div className="container mx-auto px-4 py-8">
         <motion.div
           variants={containerVariants}
@@ -555,16 +594,20 @@ const ExploreAuctionsPage = () => {
                                   <Button
                                     size="sm"
                                     className="flex-1 bg-green-500 text-white hover:bg-green-600"
+                                    onClick={handleAccept}
+                                    disabled={accepting}
                                   >
-                                    Manage
+                                    {accepting ? "Accepting..." : "Accept"}
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     className="flex-1 bg-white/50"
+                                    onClick={handleReject}
+                                    disabled={rejecting}
                                   >
                                     <Eye className="h-4 w-4 mr-2" />
-                                    View Details
+                                    {rejecting ? "Rejecting..." : "Reject"}
                                   </Button>
                                 </>
                               ) : (
@@ -621,7 +664,6 @@ const ExploreAuctionsPage = () => {
           )}
         </motion.div>
       </div>
-
       <Dialog open={bidDialogOpen} onOpenChange={setBidDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

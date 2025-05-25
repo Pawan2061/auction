@@ -10,6 +10,6 @@ import { authenticateToken } from "../middlewares/jwt";
 export const bidRouter = express.Router();
 bidRouter.post("/", authenticateToken, placeBid);
 
-bidRouter.get("/", getAuctionBids);
+bidRouter.get("/", authenticateToken, getAuctionBids);
 bidRouter.put("/accept/:bidId", authenticateToken, acceptBid);
-bidRouter.put("/reject/:id", rejectBid);
+bidRouter.put("/reject/:id", authenticateToken, rejectBid);
