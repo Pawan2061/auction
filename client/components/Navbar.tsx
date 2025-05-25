@@ -136,8 +136,9 @@ const Navbar = () => {
         password: data.password,
       }),
     onSuccess: (res) => {
+      localStorage.setItem("user-token", res.data.token);
+
       console.log("Signup Success:", res.data);
-      // Set user using Zustand store
       setUser({
         username: res.data.user.username,
         id: res.data.user.id,
@@ -164,7 +165,6 @@ const Navbar = () => {
     setLoginData({ email: "", password: "" });
     setSignupData({ name: "", email: "", password: "", confirmPassword: "" });
     console.log("User logged out");
-    // axios.post("http://localhost:3000/api/v1/auth/logout");
   };
 
   const getInitials = (username: string) => {
@@ -243,7 +243,6 @@ const Navbar = () => {
 
             <div className="flex items-center space-x-4">
               {isAuthenticated && user ? (
-                // User Profile Dropdown
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <motion.button
@@ -307,7 +306,6 @@ const Navbar = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                // Sign In Modal
                 <Dialog
                   open={isAuthModalOpen}
                   onOpenChange={setIsAuthModalOpen}

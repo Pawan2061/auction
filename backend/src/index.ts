@@ -24,7 +24,9 @@ app.use(
   })
 );
 export const io = new Server(server, {
-  cors: {},
+  cors: {
+    origin: "*",
+  },
 });
 
 app.use("/api/v1/auction", auctionRouter);

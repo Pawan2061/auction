@@ -21,6 +21,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   Search,
   Filter,
   Clock,
@@ -31,11 +41,15 @@ import {
   Timer,
   TrendingUp,
   Users,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
 import { useAuctionStore } from "@/store/auction";
 import { useUserStore } from "@/store/user";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import { toast } from "sonner";
+import { io, Socket } from "socket.io-client";
 
 interface Auction {
   id: string;
@@ -43,26 +57,185 @@ interface Auction {
   description: string;
   startingPrice: number;
   currentBid?: number;
+  currentPrice?: number;
+  highestBidId?: string;
   status: "active" | "ended" | "closed";
   endTime: string;
   bidCount: number;
+  userId: string;
   seller: {
     name: string;
+    id: string;
   };
+}
+
+interface BidUpdate {
+  auctionId: string;
+  currentPrice: number;
+  previousPrice: number;
+  bidder: {
+    id: string;
+    username: string;
+  };
+  timestamp: string;
+  bidCount: number;
 }
 
 const ExploreAuctionsPage = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [filteredAuctions, setFilteredAuctions] = useState<Auction[]>([]);
-  const { data } = useQuery({
-    queryKey: ["auction"],
-    queryFn: () => axios.get("http://localhost:3000/api/v1/auction/all"),
-  });
-
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("ending-soon");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [bidDialogOpen, setBidDialogOpen] = useState(false);
+  const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
+  const [bidAmount, setBidAmount] = useState("");
+  const [bidSubmitting, setBidSubmitting] = useState(false);
+
+  const { user } = useUserStore();
+  const queryClient = useQueryClient();
+
+  const { data, refetch } = useQuery({
+    queryKey: ["auctions"],
+    queryFn: () => axios.get("http://localhost:3000/api/v1/auction/all"),
+    refetchInterval: 30000,
+  });
+
+  const token = localStorage.getItem("user-token");
+  const placeBidMutation = useMutation({
+    mutationFn: async ({
+      auctionId,
+      amount,
+    }: {
+      auctionId: string;
+      amount: number;
+    }) => {
+      console.log(auctionId, "auction id and ", amount);
+
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/bid",
+        { auctionId, amount },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      console.log(response, "response ofc");
+
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      toast.success("Bid placed successfully!");
+      setBidDialogOpen(false);
+      setBidAmount("");
+      setBidSubmitting(false);
+
+      if (selectedAuction) {
+        const newBidAmount = variables.amount;
+        setAuctions((prevAuctions) =>
+          prevAuctions.map((auction) =>
+            auction.id === selectedAuction.id
+              ? {
+                  ...auction,
+                  currentPrice: newBidAmount,
+                  currentBid: newBidAmount,
+                  bidCount: auction.bidCount + 1,
+                }
+              : auction
+          )
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["auctions"] });
+    },
+    onError: (error: any) => {
+      console.log(error, "error here");
+
+      const errorMessage = error.response?.data?.error || "Failed to place bid";
+      toast.error(errorMessage);
+      setBidSubmitting(false);
+    },
+  });
+
+  useEffect(() => {
+    console.log("inside sockert socket");
+
+    const socketInstance = io("http://localhost:3001", {});
+    console.log("conected socket");
+
+    setSocket(socketInstance);
+
+    socketInstance.on("bidUpdate", (update: BidUpdate) => {
+      console.log("Received bid update:", update);
+
+      setAuctions((prevAuctions) =>
+        prevAuctions.map((auction) =>
+          auction.id === update.auctionId
+            ? {
+                ...auction,
+                currentPrice: update.currentPrice,
+                currentBid: update.currentPrice,
+                bidCount: update.bidCount,
+              }
+            : auction
+        )
+      );
+
+      if (update.bidder.id !== user?.id) {
+        toast.info(
+          `New bid of $${update.currentPrice} placed by ${update.bidder.username}`,
+          {
+            duration: 3000,
+          }
+        );
+      }
+    });
+
+    socketInstance.on(
+      "bidError",
+      (error: { error: string; auctionId: string }) => {
+        toast.error(error.error);
+      }
+    );
+
+    return () => {
+      socketInstance.disconnect();
+    };
+  }, [token, user?.id]);
+
+  useEffect(() => {
+    if (socket && auctions.length > 0) {
+      auctions.forEach((auction) => {
+        socket.emit("joinAuction", auction.id);
+
+        socket.on(`newBid_${auction.id}`, (bidData: any) => {
+          console.log(`New bid for auction ${auction.id}:`, bidData);
+
+          setAuctions((prevAuctions) =>
+            prevAuctions.map((a) =>
+              a.id === auction.id
+                ? {
+                    ...a,
+                    currentPrice: bidData.currentPrice || bidData.amount,
+                    currentBid: bidData.currentPrice || bidData.amount,
+                    bidCount: bidData.bidCount || a.bidCount + 1,
+                  }
+                : a
+            )
+          );
+        });
+      });
+
+      return () => {
+        auctions.forEach((auction) => {
+          socket.off(`newBid_${auction.id}`);
+        });
+      };
+    }
+  }, [socket, auctions]);
 
   useEffect(() => {
     let filtered = auctions.filter((auction) => {
@@ -79,10 +252,9 @@ const ExploreAuctionsPage = () => {
         case "ending-soon":
           return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
         case "highest-bid":
-          return (
-            (b.currentBid || b.startingPrice) -
-            (a.currentBid || a.startingPrice)
-          );
+          const aPrice = a.currentPrice || a.currentBid || a.startingPrice;
+          const bPrice = b.currentPrice || b.currentBid || b.startingPrice;
+          return bPrice - aPrice;
         case "most-bids":
           return b.bidCount - a.bidCount;
         case "newest":
@@ -94,6 +266,14 @@ const ExploreAuctionsPage = () => {
 
     setFilteredAuctions(filtered);
   }, [auctions, searchTerm, sortBy, statusFilter]);
+
+  useEffect(() => {
+    if (data?.data.auctions) {
+      console.log("API Response:", data.data.auctions);
+      setAuctions(data.data.auctions);
+      setLoading(false);
+    }
+  }, [data]);
 
   const getTimeRemaining = (endTime: string) => {
     const now = new Date().getTime();
@@ -118,6 +298,42 @@ const ExploreAuctionsPage = () => {
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const getCurrentPrice = (auction: Auction) => {
+    if (auction.currentPrice && auction.currentPrice > 0)
+      return auction.currentPrice;
+    if (auction.currentBid && auction.currentBid > 0) return auction.currentBid;
+    return auction.startingPrice;
+  };
+
+  const getMinimumBid = (auction: Auction) => {
+    const currentPrice = getCurrentPrice(auction);
+    return currentPrice + 1;
+  };
+
+  const handleBidClick = (auction: Auction) => {
+    setSelectedAuction(auction);
+    setBidAmount(getMinimumBid(auction).toString());
+    setBidDialogOpen(true);
+  };
+
+  const handlePlaceBid = () => {
+    if (!selectedAuction || !bidAmount) return;
+
+    const amount = parseFloat(bidAmount);
+    const minimumBid = getMinimumBid(selectedAuction);
+
+    if (amount < minimumBid) {
+      toast.error(`Bid must be at least $${minimumBid}`);
+      return;
+    }
+
+    setBidSubmitting(true);
+    placeBidMutation.mutate({
+      auctionId: selectedAuction.id,
+      amount,
+    });
   };
 
   const containerVariants = {
@@ -246,86 +462,138 @@ const ExploreAuctionsPage = () => {
             ) : (
               <AnimatePresence>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.data.auctions.map((auction: any, index: any) => (
-                    <motion.div
-                      key={auction.id}
-                      variants={itemVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="hidden"
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card className="group border-0 shadow-lg bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-                        <CardHeader className="space-y-3">
-                          <div className="flex justify-between items-start">
-                            <Badge className={getStatusColor(auction.status)}>
-                              {auction.status}
-                            </Badge>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <Timer className="h-4 w-4 mr-1" />
-                              {getTimeRemaining(auction.endTime)}
-                            </div>
-                          </div>
-                          <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                            {auction.name}
-                          </CardTitle>
-                          <CardDescription className="text-sm text-gray-600 line-clamp-2">
-                            {auction.description}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-xs text-gray-500">
-                                Current Bid
-                              </p>
-                              <p className="text-xl font-bold text-green-600">
-                                ${auction.currentBid || auction.startingPrice}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-gray-500">
-                                Starting Price
-                              </p>
-                              <p className="text-sm text-gray-700">
-                                ${auction.startingPrice}
-                              </p>
-                            </div>
-                          </div>
+                  {filteredAuctions.map((auction, index) => {
+                    const currentPrice = getCurrentPrice(auction);
+                    const isOwner = auction.userId === user?.id;
+                    const timeRemaining = getTimeRemaining(auction.endTime);
+                    const isActive =
+                      auction.status === "active" && timeRemaining !== "Ended";
+                    const hasBids = currentPrice > auction.startingPrice;
 
-                          <div className="flex items-center justify-between text-sm text-gray-600">
-                            <div className="flex items-center space-x-1">
-                              <Users className="h-4 w-4" />
-                              <span>{auction.bidCount} bids</span>
+                    return (
+                      <motion.div
+                        key={auction.id}
+                        variants={itemVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Card className="group border-0 shadow-lg bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer relative overflow-hidden">
+                          {isActive && (
+                            <div className="absolute top-2 right-2 z-10">
+                              <div className="flex items-center space-x-1 bg-red-500 text-white px-2 py-1 rounded-full text-xs">
+                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                <span>LIVE</span>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Gavel className="h-4 w-4" />
-                              <span>{auction.seller.name}</span>
-                            </div>
-                          </div>
+                          )}
 
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 bg-white/50"
-                              disabled={auction.status !== "active"}
-                            >
-                              <DollarSign className="h-4 w-4 mr-2" />
-                              Bid Now
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
+                          <CardHeader className="space-y-3">
+                            <div className="flex justify-between items-start">
+                              <Badge className={getStatusColor(auction.status)}>
+                                {auction.status}
+                              </Badge>
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Timer className="h-4 w-4 mr-1" />
+                                {timeRemaining}
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {auction.name}
+                            </CardTitle>
+                            <CardDescription className="text-sm text-gray-600 line-clamp-2">
+                              {auction.description}
+                            </CardDescription>
+                          </CardHeader>
+
+                          <CardContent className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-xs text-gray-500">
+                                  {hasBids ? "Current Bid" : "Starting Price"}
+                                </p>
+                                <p className="text-xl font-bold text-green-600 flex items-center">
+                                  ${currentPrice}
+                                  {hasBids && (
+                                    <TrendingUp className="h-4 w-4 ml-1 text-green-500" />
+                                  )}
+                                </p>
+                                {!hasBids && (
+                                  <p className="text-xs text-gray-500">
+                                    No bids yet
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-gray-500">
+                                  {hasBids ? "Starting Price" : "Minimum Bid"}
+                                </p>
+                                <p className="text-sm text-gray-700">
+                                  $
+                                  {hasBids
+                                    ? auction.startingPrice
+                                    : getMinimumBid(auction)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm text-gray-600">
+                              <div className="flex items-center space-x-1">
+                                <Users className="h-4 w-4" />
+                                <span>{auction.bidCount} bids</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Gavel className="h-4 w-4" />
+                                <span>{auction.seller.name}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex space-x-2">
+                              {isOwner ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 bg-green-500 text-white hover:bg-green-600"
+                                  >
+                                    Manage
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 bg-white/50"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 bg-white/50 hover:bg-gradient-to-r hover:from-green-500 hover:to-green-600 hover:text-white"
+                                    disabled={!isActive}
+                                    onClick={() => handleBidClick(auction)}
+                                  >
+                                    <Zap className="h-4 w-4 mr-2" />
+                                    {isActive ? "Bid Now" : "Ended"}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </AnimatePresence>
             )}
@@ -353,6 +621,82 @@ const ExploreAuctionsPage = () => {
           )}
         </motion.div>
       </div>
+
+      <Dialog open={bidDialogOpen} onOpenChange={setBidDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Gavel className="h-5 w-5" />
+              <span>Place Your Bid</span>
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAuction && (
+                <>
+                  Bidding on <strong>{selectedAuction.name}</strong>
+                  <br />
+                  Current price:{" "}
+                  <strong>${getCurrentPrice(selectedAuction)}</strong>
+                  <br />
+                  Minimum bid:{" "}
+                  <strong>${getMinimumBid(selectedAuction)}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="bid-amount" className="text-right">
+                Amount ($)
+              </Label>
+              <div className="col-span-3 relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="bid-amount"
+                  type="number"
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  className="pl-10"
+                  min={selectedAuction ? getMinimumBid(selectedAuction) : 1}
+                  step="1"
+                />
+              </div>
+            </div>
+            {selectedAuction &&
+              parseFloat(bidAmount) < getMinimumBid(selectedAuction) && (
+                <div className="flex items-center space-x-2 text-amber-600 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>
+                    Bid must be at least ${getMinimumBid(selectedAuction)}
+                  </span>
+                </div>
+              )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBidDialogOpen(false)}
+              disabled={bidSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handlePlaceBid}
+              // @ts-ignore
+              disabled={
+                bidSubmitting ||
+                !bidAmount ||
+                (selectedAuction &&
+                  parseFloat(bidAmount) < getMinimumBid(selectedAuction))
+              }
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+            >
+              {bidSubmitting ? "Placing Bid..." : "Place Bid"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

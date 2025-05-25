@@ -57,7 +57,6 @@ const AuctionCreationPage = () => {
 
     onSuccess: (res) => {
       toast.success("Auction created successfully!");
-      console.log(res, "res will be here");
 
       const createdAuction = res.data.auction;
       console.log(createAuction, "is here");

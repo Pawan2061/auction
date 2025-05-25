@@ -98,6 +98,8 @@ export const placeBid = async (req: AuthRequest, res: any) => {
         room?.size || 0
       );
     } else {
+      console.log("biddig not possible");
+
       console.warn("Socket.IO instance not available");
     }
 

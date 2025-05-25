@@ -64,7 +64,6 @@ export const getAuctions = async (req: Request, res: any) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-    console.log(auctions, "will be here");
 
     const auctionsWithDetails = await Promise.all(
       auctions.map(async (auction) => {

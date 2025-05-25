@@ -6,7 +6,7 @@ import User from "../models/user";
 export class AuctionService {
   static async getHighestBid(auctionId: string): Promise<number | null> {
     try {
-      const cachedBid = await client.get(`auction:${auctionId}:highest_bid`);
+      const cachedBid = await client.lPop(`auction:${auctionId}:highest_bid`);
       if (cachedBid) {
         return parseFloat(cachedBid);
       }
@@ -18,9 +18,8 @@ export class AuctionService {
 
       const amount = highestBid ? highestBid.amount : null;
       if (amount !== null) {
-        await client.setex(
+        await client.lPush(
           `auction:${auctionId}:highest_bid`,
-          300,
           amount.toString()
         );
       }
@@ -38,12 +37,8 @@ export class AuctionService {
     bidId: string
   ): Promise<void> {
     try {
-      await client.setex(
-        `auction:${auctionId}:highest_bid`,
-        300,
-        amount.toString()
-      );
-      await client.setex(`auction:${auctionId}:highest_bid_id`, 300, bidId);
+      await client.lPush(`auction:${auctionId}:highest_bid`, amount.toString());
+      await client.lPush(`auction:${auctionId}:highest_bid_id`, bidId);
     } catch (error) {
       console.error("Error setting highest bid in Redis:", error);
     }

@@ -27,7 +27,7 @@ interface AuctionStore {
   isLoading: boolean;
   error: string | null;
 
-  fetchAuctions: () => Promise<void>;
+  fetchAuctions: () => any;
   setSelectedAuction: (auction: Auction | null) => void;
   addAuction: (newAuction: Auction) => void;
   removeAuction: (auctionId: string) => void;
@@ -42,24 +42,30 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
   fetchAuctions: async () => {
     set({ isLoading: true, error: null });
+
     try {
       const token = localStorage.getItem("token");
+
       const res = await axios.get("http://localhost:3000/api/v1/auction/all", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      console.log(res.data, "data okay");
 
-      set({ auctions: res.data.auctions, isLoading: false });
+      const auctions = res.data.auctions;
+      set({ auctions, isLoading: false });
+
+      return auctions;
     } catch (error: any) {
-      set({
-        error: error.message || "Failed to fetch auctions",
-        isLoading: false,
-      });
+      const message =
+        error?.response?.data?.message ||
+        error.message ||
+        "Failed to fetch auctions";
+      set({ error: message, isLoading: false });
+
+      return [];
     }
   },
-
   setSelectedAuction: (auction) => set({ selectedAuction: auction }),
 
   addAuction: (newAuction) =>
