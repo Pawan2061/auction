@@ -7,6 +7,7 @@ import "./models/bid";
 import { auctionRouter } from "./routes/auction";
 import { bidRouter } from "./routes/bid";
 import { authRouter } from "./routes/auth";
+import cors from "cors";
 import { connectRedis } from "./db/redis";
 import { createServer } from "http";
 import { AuctionService } from "./utils/auctionService";
@@ -17,6 +18,11 @@ const app = express();
 const server = createServer(app);
 
 app.use(express.json());
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 export const io = new Server(server, {
   cors: {},
 });

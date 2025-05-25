@@ -11,5 +11,5 @@ export const bidRouter = express.Router();
 bidRouter.post("/", authenticateToken, placeBid);
 
 bidRouter.get("/", getAuctionBids);
-bidRouter.put("/accept/:id", acceptBid);
+bidRouter.put("/accept/:bidId", authenticateToken, acceptBid);
 bidRouter.put("/reject/:id", rejectBid);

@@ -136,7 +136,7 @@ export const acceptBid = async (req: AuthRequest, res: any) => {
         {
           model: Auction,
           as: "auction",
-          attributes: ["id", "userId", "endTime", "title"],
+          attributes: ["id", "userId", "endTime", "name"],
         },
         {
           model: User,
@@ -151,6 +151,8 @@ export const acceptBid = async (req: AuthRequest, res: any) => {
     }
 
     if (bid.auction?.userId !== userId) {
+      console.log(bid.auction?.userId, "bid action id and user id is ", userId);
+
       return res.status(403).json({
         error: "Only the auction owner can accept bids",
       });
@@ -188,7 +190,7 @@ export const acceptBid = async (req: AuthRequest, res: any) => {
     );
 
     await Auction.update(
-      { endTime: new Date() },
+      { endTime: new Date(), status: "closed" },
       { where: { id: bid.auctionId } }
     );
 
@@ -244,7 +246,7 @@ export const rejectBid = async (req: AuthRequest, res: any) => {
         {
           model: Auction,
           as: "auction",
-          attributes: ["id", "userId", "endTime", "title"],
+          attributes: ["id", "userId", "endTime", "name"],
         },
         {
           model: User,

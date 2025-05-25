@@ -141,7 +141,6 @@ const AuctionLanding = () => {
 
   return (
     <div className=" bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 text-slate-800 overflow-hidden">
-      {/* Notifications */}
       <AnimatePresence>
         {notifications.map((notification) => (
           <motion.div
@@ -163,7 +162,6 @@ const AuctionLanding = () => {
         ))}
       </AnimatePresence>
 
-      {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
           style={{ y: y1 }}
@@ -197,43 +195,6 @@ const AuctionLanding = () => {
           }}
         />
       </div>
-
-      {/* Navigation */}
-      {/* <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="relative z-50 flex items-center justify-between p-6 lg:px-12 bg-white/80 backdrop-blur-md border-b border-slate-200/50"
-      >
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          className="flex items-center space-x-2 cursor-pointer"
-        >
-          <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-lg">
-            <Gavel className="w-6 h-6 text-white" />
-          </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            AuctionHub
-          </span>
-        </motion.div>
-
-        <div className="hidden md:flex items-center space-x-8">
-          <Button
-            variant="ghost"
-            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          >
-            Live Auctions
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          >
-            How It Works
-          </Button>
-          <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg">
-            Sign In
-          </Button>
-        </div>
-      </motion.nav> */}
 
       <motion.section
         variants={containerVariants}
@@ -501,7 +462,6 @@ const AuctionLanding = () => {
         </div>
       </motion.section>
 
-      {/* Features Section */}
       <motion.section
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}

@@ -83,7 +83,6 @@ const Navbar = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Zustand store
   const { user, isAuthenticated, setUser, clearUser } = useUserStore();
 
   const [loginData, setLoginData] = useState<FormData>({
@@ -107,7 +106,7 @@ const Navbar = () => {
       axios.post("http://localhost:3000/api/v1/auth/login", data),
     onSuccess: (res) => {
       console.log("Login Success:", res.data);
-      // Set user using Zustand store
+      localStorage.setItem("user-token", res.data.token);
       setUser({
         username: res.data.user.username,
         id: res.data.user.id,

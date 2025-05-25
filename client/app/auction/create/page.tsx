@@ -15,6 +15,10 @@ import {
   Sparkles,
   CheckCircle,
 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import axios from "axios";
+import { useAuctionStore } from "@/store/auction";
 
 interface AuctionFormData {
   name: string;
@@ -41,6 +45,58 @@ const AuctionCreationPage = () => {
     { value: "10", label: "10 minutes", description: "Extended" },
     { value: "30", label: "30 minutes", description: "Long auction" },
   ];
+  const token = localStorage.getItem("user-token");
+  const { addAuction } = useAuctionStore();
+  const { mutate: createAuction, isPending } = useMutation({
+    mutationFn: (data: AuctionFormData) =>
+      axios.post("http://localhost:3000/api/v1/auction", data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+
+    onSuccess: (res) => {
+      toast.success("Auction created successfully!");
+      console.log(res, "res will be here");
+
+      const createdAuction = res.data.auction;
+      console.log(createAuction, "is here");
+
+      addAuction({
+        id: createdAuction.id,
+        name: createdAuction.name,
+        description: createdAuction.description,
+        startingPrice: createdAuction.startingPrice,
+        duration: createdAuction.duration,
+        status: createdAuction.status,
+        highestBidId: createdAuction.highestBidId,
+        userId: createdAuction.userId,
+        createdAt: createdAuction.createdAt,
+        updatedAt: createdAuction.updatedAt,
+        endTime: createdAuction.endTime,
+        seller: {
+          id: createdAuction.seller.id,
+          name: createdAuction.seller.username,
+        },
+      });
+
+      setIsSuccess(true);
+      setFormData({
+        name: "",
+        description: "",
+        startingPrice: "",
+        duration: "",
+      });
+
+      setTimeout(() => {
+        setIsSuccess(false);
+      }, 3000);
+    },
+    onError: (error: any) => {
+      console.error("Error creating auction:", error);
+      toast.error("Failed to create auction. Please try again.");
+    },
+  });
 
   const validateForm = (): boolean => {
     const newErrors: Partial<AuctionFormData> = {};
@@ -70,39 +126,14 @@ const AuctionCreationPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
-    setIsSubmitting(true);
+    console.log(formData, "formdata is here");
 
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      console.log("Auction Data:", {
-        name: formData.name,
-        description: formData.description,
-        startingPrice: Number(formData.startingPrice),
-        duration: Number(formData.duration),
-      });
-
-      setIsSuccess(true);
-
-      setTimeout(() => {
-        setIsSuccess(false);
-        setFormData({
-          name: "",
-          description: "",
-          startingPrice: "",
-          duration: "",
-        });
-      }, 3000);
-    } catch (error) {
-      console.error("Error creating auction:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    createAuction(formData);
   };
 
   const handleInputChange = (field: keyof AuctionFormData, value: string) => {
@@ -169,7 +200,6 @@ const AuctionCreationPage = () => {
 
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Item Name */}
                 <motion.div
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}

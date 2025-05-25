@@ -32,6 +32,10 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { useAuctionStore } from "@/store/auction";
+import { useUserStore } from "@/store/user";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 
 interface Auction {
   id: string;
@@ -50,76 +54,15 @@ interface Auction {
 const ExploreAuctionsPage = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [filteredAuctions, setFilteredAuctions] = useState<Auction[]>([]);
+  const { data } = useQuery({
+    queryKey: ["auction"],
+    queryFn: () => axios.get("http://localhost:3000/api/v1/auction/all"),
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("ending-soon");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const mockAuctions: Auction[] = [
-      {
-        id: "1",
-        name: "Vintage Guitar Collection",
-        description:
-          "Beautiful 1967 Fender Stratocaster in excellent condition",
-        startingPrice: 500,
-        currentBid: 1250,
-        status: "active",
-        endTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
-        bidCount: 12,
-        seller: { name: "John Doe" },
-      },
-      {
-        id: "2",
-        name: "Modern Art Painting",
-        description: "Abstract expressionist piece by local artist",
-        startingPrice: 200,
-        currentBid: 350,
-        status: "active",
-        endTime: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
-        bidCount: 8,
-        seller: { name: "Art Gallery" },
-      },
-      {
-        id: "3",
-        name: "Rare Book Collection",
-        description: "First edition classics from the 19th century",
-        startingPrice: 800,
-        currentBid: 1100,
-        status: "active",
-        endTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        bidCount: 15,
-        seller: { name: "Book Store" },
-      },
-      {
-        id: "4",
-        name: "Antique Watch",
-        description: "Swiss mechanical watch from 1950s",
-        startingPrice: 300,
-        status: "active",
-        endTime: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
-        bidCount: 3,
-        seller: { name: "Watch Collector" },
-      },
-      {
-        id: "5",
-        name: "Designer Handbag",
-        description: "Limited edition luxury handbag",
-        startingPrice: 400,
-        currentBid: 650,
-        status: "active",
-        endTime: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
-        bidCount: 9,
-        seller: { name: "Fashion House" },
-      },
-    ];
-
-    setTimeout(() => {
-      setAuctions(mockAuctions);
-      setFilteredAuctions(mockAuctions);
-      setLoading(false);
-    }, 1000);
-  }, []);
 
   useEffect(() => {
     let filtered = auctions.filter((auction) => {
@@ -303,7 +246,7 @@ const ExploreAuctionsPage = () => {
             ) : (
               <AnimatePresence>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredAuctions.map((auction, index) => (
+                  {data?.data.auctions.map((auction: any, index: any) => (
                     <motion.div
                       key={auction.id}
                       variants={itemVariants}
