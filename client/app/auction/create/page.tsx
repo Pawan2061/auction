@@ -19,6 +19,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axios from "axios";
 import { useAuctionStore } from "@/store/auction";
+import { useRouter } from "next/navigation";
 
 interface AuctionFormData {
   name: string;
@@ -38,6 +39,7 @@ const AuctionCreationPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Partial<AuctionFormData>>({});
+  const router = useRouter();
 
   const durationOptions = [
     { value: "2", label: "2 minutes", description: "Quick auction" },
@@ -59,6 +61,7 @@ const AuctionCreationPage = () => {
       toast.success("Auction created successfully!");
 
       const createdAuction = res.data.auction;
+
       console.log(createAuction, "is here");
 
       addAuction({
@@ -87,6 +90,7 @@ const AuctionCreationPage = () => {
         duration: "",
       });
 
+      router.push("/auction/explore");
       setTimeout(() => {
         setIsSuccess(false);
       }, 3000);

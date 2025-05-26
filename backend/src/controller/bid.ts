@@ -412,10 +412,7 @@ export const rejectBid = async (req: AuthRequest, res: any) => {
 
 export const getAuctionBids = async (req: Request, res: Response) => {
   try {
-    // const { auctionId } = req.params;
-
     const bids = await Bid.findAll({
-      // where: { auctionId },
       include: [
         {
           model: User,
@@ -425,8 +422,6 @@ export const getAuctionBids = async (req: Request, res: Response) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-
-    // const currentHighestBid = await AuctionService.getHighestBid(auctionId);
 
     const pendingBids = bids.filter((bid) => bid.status === BidStatus.PENDING);
     const acceptedBids = bids.filter(

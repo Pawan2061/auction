@@ -100,7 +100,7 @@ const Navbar = () => {
 
   const navLinks = [
     { href: "/auction", label: "Auctions", icon: Gavel },
-    { href: "/your-bids", label: "Your Bids", icon: Trophy, badge: "3" },
+    { href: "/bids", label: "Your Bids", icon: Trophy, badge: "3" },
   ];
 
   const loginMutation = useMutation({

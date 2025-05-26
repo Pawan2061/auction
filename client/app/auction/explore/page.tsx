@@ -46,7 +46,6 @@ import {
   Zap,
   Radio,
 } from "lucide-react";
-import { useAuctionStore } from "@/store/auction";
 import { useUserStore } from "@/store/user";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -55,6 +54,7 @@ import { io, Socket } from "socket.io-client";
 import SocketStreamComponent from "@/components/stream-socket";
 import SocketStreamDialog from "@/components/stream-socket";
 import { useAcceptBid, useRejectBid } from "@/hooks/bid";
+import { useAuctionStore } from "@/store/auction";
 
 interface Auction {
   id: string;
@@ -100,6 +100,8 @@ const ExploreAuctionsPage = () => {
   const [bidSubmitting, setBidSubmitting] = useState(false);
   const { mutate: acceptBid, isPending: accepting } = useAcceptBid();
   const { mutate: rejectBid, isPending: rejecting } = useRejectBid();
+  const { removeAuction } = useAuctionStore();
+
   const acceptBidMutation = useMutation({
     mutationFn: async (bidId: string) => {
       const token = localStorage.getItem("user-token");
@@ -130,6 +132,7 @@ const ExploreAuctionsPage = () => {
             : auction
         )
       );
+      removeAuction(bidId);
 
       queryClient.invalidateQueries({ queryKey: ["auctions"] });
       refetch();
@@ -162,6 +165,7 @@ const ExploreAuctionsPage = () => {
     },
     onSuccess: (data, bidId) => {
       toast.success("Bid rejected successfully!");
+      removeAuction(bidId);
 
       queryClient.invalidateQueries({ queryKey: ["auctions"] });
       refetch();
