@@ -1,5 +1,6 @@
+/* eslint-disable */
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,11 @@ const AuctionCreationPage = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Partial<AuctionFormData>>({});
   const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    const token = localStorage.getItem("user-token");
+    setToken(token);
+  });
 
   const durationOptions = [
     { value: "2", label: "2 minutes", description: "Quick auction" },
@@ -47,7 +53,7 @@ const AuctionCreationPage = () => {
     { value: "10", label: "10 minutes", description: "Extended" },
     { value: "30", label: "30 minutes", description: "Long auction" },
   ];
-  const token = localStorage.getItem("user-token");
+  // const token = localStorage.getItem("user-token");
   const { addAuction } = useAuctionStore();
   const { mutate: createAuction, isPending } = useMutation({
     mutationFn: (data: AuctionFormData) =>

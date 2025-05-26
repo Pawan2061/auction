@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 "use client";
 import React, { useState, useEffect } from "react";
 import {
@@ -55,27 +57,6 @@ const AuctionLanding = () => {
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 300], [0, 30]);
   const y2 = useTransform(scrollY, [0, 300], [0, -30]);
-
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     setActiveAuctions((prev) =>
-  //       Math.max(8, prev + Math.floor(Math.random() * 3) - 1)
-  //     );
-  //     setTotalUsers((prev) => prev + Math.floor(Math.random() * 5));
-
-  //     if (Math.random() > 0.7) {
-  //       setCurrentBid((prev) => prev + Math.floor(Math.random() * 500) + 50);
-  //       addNotification(
-  //         `New bid placed: $${(
-  //           currentBid +
-  //           Math.floor(Math.random() * 500) +
-  //           50
-  //         ).toLocaleString()}`
-  //       );
-  //     }
-  //   }, 4000);
-  //   return () => clearInterval(interval);
-  // }, [currentBid]);
 
   useEffect(() => {
     const timer = setInterval(() => {

@@ -1,11 +1,16 @@
 import { Request, Response } from "express";
 import { Server } from "socket.io";
 import Bid, { BidStatus } from "../models/bid";
+import sgMail from "@sendgrid/mail";
+
 import Auction from "../models/auction";
 import User from "../models/user";
 import { AuctionService } from "../utils/auctionService";
 import { io } from "..";
+import dotenv from "dotenv";
 
+dotenv.config();
+sgMail.setApiKey("SKe307daf1f3700d837846d7e82e91af0f");
 interface AuthRequest extends Request {
   userId?: string;
 }
@@ -74,8 +79,6 @@ export const placeBid = async (req: AuthRequest, res: any) => {
     });
 
     if (io) {
-      console.log(`Emitting global bid events for auction ${auctionId}`);
-
       io.to(`auction_${auctionId}`).emit("newBid", {
         bid: bidWithUser,
         currentPrice: amount,
@@ -107,10 +110,6 @@ export const placeBid = async (req: AuthRequest, res: any) => {
       });
 
       const room = io.sockets.adapter.rooms.get(`auction_${auctionId}`);
-      console.log(
-        `Active connections in auction_${auctionId}:`,
-        room?.size || 0
-      );
     } else {
       console.log("Socket.IO instance not available");
     }

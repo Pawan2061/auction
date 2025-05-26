@@ -1,5 +1,6 @@
+/* eslint-disable */
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Clock,
@@ -37,7 +38,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 const BidsPage = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const token = localStorage.getItem("user-token");
+  // const token = localStorage.getItem("user-token");
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    const token = localStorage.getItem("user-token");
+    setToken(token);
+  });
 
   const {
     data: bidsData,

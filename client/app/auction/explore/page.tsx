@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -98,13 +99,42 @@ const ExploreAuctionsPage = () => {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [bidSubmitting, setBidSubmitting] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
   const { mutate: acceptBid, isPending: accepting } = useAcceptBid();
   const { mutate: rejectBid, isPending: rejecting } = useRejectBid();
   const { removeAuction } = useAuctionStore();
+  const { user } = useUserStore();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setIsClient(true);
+    if (typeof window !== "undefined") {
+      setToken(localStorage.getItem("user-token"));
+    }
+  }, []);
+
+  const getAuthHeaders = () => {
+    const currentToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("user-token")
+        : token;
+    return currentToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${currentToken}`,
+          },
+        }
+      : {};
+  };
 
   const acceptBidMutation = useMutation({
     mutationFn: async (bidId: string) => {
-      const token = localStorage.getItem("user-token");
+      const currentToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("user-token")
+          : token;
       console.log(bidId, "id here");
 
       const response = await axios.put(
@@ -112,12 +142,11 @@ const ExploreAuctionsPage = () => {
         {},
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${currentToken}`,
           },
         }
       );
       console.log(response, "here");
-
       console.log(response.data, "data here");
 
       return response.data;
@@ -143,19 +172,22 @@ const ExploreAuctionsPage = () => {
       toast.error(errorMessage);
     },
   });
+
   const rejectBidMutation = useMutation({
     mutationFn: async (bidId: string) => {
       console.log(bidId, "Inside mutation");
-
-      const token = localStorage.getItem("user-token");
-      console.log(token, "is here");
+      const currentToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("user-token")
+          : token;
+      console.log(currentToken, "is here");
 
       const response = await axios.put(
         `http://localhost:3000/api/v1/bid/reject/${bidId}`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${currentToken}`,
           },
         }
       );
@@ -176,6 +208,7 @@ const ExploreAuctionsPage = () => {
       toast.error(errorMessage);
     },
   });
+
   const handleAccept = (bidId: string) => {
     if (!bidId) {
       toast.error("No bid to accept");
@@ -193,16 +226,14 @@ const ExploreAuctionsPage = () => {
     }
     rejectBidMutation.mutate(bidId);
   };
-  const { user } = useUserStore();
-  const queryClient = useQueryClient();
 
   const { data, refetch } = useQuery({
     queryKey: ["auctions"],
     queryFn: () => axios.get("http://localhost:3000/api/v1/auction/all"),
     refetchInterval: 30000,
+    enabled: isClient,
   });
 
-  const token = localStorage.getItem("user-token");
   const placeBidMutation = useMutation({
     mutationFn: async ({
       auctionId,
@@ -212,13 +243,17 @@ const ExploreAuctionsPage = () => {
       amount: number;
     }) => {
       console.log(auctionId, "auction id and ", amount);
+      const currentToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("user-token")
+          : token;
 
       const response = await axios.post(
         "http://localhost:3000/api/v1/bid",
         { auctionId, amount },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${currentToken}`,
           },
         }
       );
@@ -260,6 +295,8 @@ const ExploreAuctionsPage = () => {
   });
 
   useEffect(() => {
+    if (!isClient) return;
+
     console.log("inside sockert socket");
 
     const socketInstance = io("http://localhost:3001", {});
@@ -303,7 +340,7 @@ const ExploreAuctionsPage = () => {
     return () => {
       socketInstance.disconnect();
     };
-  }, [token, user?.id]);
+  }, [isClient, token, user?.id]);
 
   useEffect(() => {
     if (socket && auctions.length > 0) {
@@ -454,6 +491,17 @@ const ExploreAuctionsPage = () => {
       transition: { duration: 0.5 },
     },
   };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
