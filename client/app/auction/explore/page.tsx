@@ -100,14 +100,95 @@ const ExploreAuctionsPage = () => {
   const [bidSubmitting, setBidSubmitting] = useState(false);
   const { mutate: acceptBid, isPending: accepting } = useAcceptBid();
   const { mutate: rejectBid, isPending: rejecting } = useRejectBid();
-  const handleAccept = () => {
-    toast.success("Bid placed successfully!");
+  const acceptBidMutation = useMutation({
+    mutationFn: async (bidId: string) => {
+      const token = localStorage.getItem("user-token");
+      console.log(bidId, "id here");
+
+      const response = await axios.put(
+        `http://localhost:3000/api/v1/bid/accept/${bidId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      console.log(response, "here");
+
+      console.log(response.data, "data here");
+
+      return response.data;
+    },
+    onSuccess: (data, bidId) => {
+      toast.success("Bid accepted successfully!");
+
+      setAuctions((prevAuctions) =>
+        prevAuctions.map((auction) =>
+          auction.highestBidId === bidId
+            ? { ...auction, status: "closed" as const }
+            : auction
+        )
+      );
+
+      queryClient.invalidateQueries({ queryKey: ["auctions"] });
+      refetch();
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.error || "Failed to accept bid";
+      toast.error(errorMessage);
+    },
+  });
+  const rejectBidMutation = useMutation({
+    mutationFn: async (bidId: string) => {
+      console.log(bidId, "Inside mutation");
+
+      const token = localStorage.getItem("user-token");
+      console.log(token, "is here");
+
+      const response = await axios.put(
+        `http://localhost:3000/api/v1/bid/reject/${bidId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      console.log(response.data, "oka here");
+
+      return response.data;
+    },
+    onSuccess: (data, bidId) => {
+      toast.success("Bid rejected successfully!");
+
+      queryClient.invalidateQueries({ queryKey: ["auctions"] });
+      refetch();
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.error || "Failed to reject bid";
+      toast.error(errorMessage);
+    },
+  });
+  const handleAccept = (bidId: string) => {
+    if (!bidId) {
+      toast.error("No bid to accept");
+      return;
+    }
+    acceptBidMutation.mutate(bidId);
   };
 
-  const handleReject = () => {
-    toast.success("Bid rejected successfully");
-  };
+  const handleReject = (bidId: string) => {
+    console.log(bidId, "is here");
 
+    if (!bidId) {
+      toast.error("No bid to reject");
+      return;
+    }
+    rejectBidMutation.mutate(bidId);
+  };
   const { user } = useUserStore();
   const queryClient = useQueryClient();
 
@@ -594,7 +675,9 @@ const ExploreAuctionsPage = () => {
                                   <Button
                                     size="sm"
                                     className="flex-1 bg-green-500 text-white hover:bg-green-600"
-                                    onClick={handleAccept}
+                                    onClick={() => {
+                                      handleAccept(auction.highestBidId!);
+                                    }}
                                     disabled={accepting}
                                   >
                                     {accepting ? "Accepting..." : "Accept"}
@@ -603,7 +686,9 @@ const ExploreAuctionsPage = () => {
                                     size="sm"
                                     variant="outline"
                                     className="flex-1 bg-white/50"
-                                    onClick={handleReject}
+                                    onClick={() =>
+                                      handleReject(auction.highestBidId!)
+                                    }
                                     disabled={rejecting}
                                   >
                                     <Eye className="h-4 w-4 mr-2" />

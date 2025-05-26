@@ -74,19 +74,33 @@ export const placeBid = async (req: AuthRequest, res: any) => {
     });
 
     if (io) {
-      console.log(`Emitting newBid event to auction_${auctionId}`);
+      console.log(`Emitting global bid events for auction ${auctionId}`);
 
       io.to(`auction_${auctionId}`).emit("newBid", {
         bid: bidWithUser,
         currentPrice: amount,
         previousPrice: minimumBid,
         auctionId,
+        auctionName: auction.name,
         timestamp: new Date().toISOString(),
         bidCount: await Bid.count({ where: { auctionId } }),
       });
 
       io.emit("bidUpdate", {
         auctionId,
+        auctionName: auction.name,
+        currentPrice: amount,
+        previousPrice: minimumBid,
+        bidder: bidWithUser?.bidder,
+        timestamp: new Date().toISOString(),
+        bidCount: await Bid.count({ where: { auctionId } }),
+        bid: bidWithUser,
+      });
+
+      io.emit("auctionActivity", {
+        type: "bid_placed",
+        auctionId,
+        auctionName: auction.name,
         currentPrice: amount,
         bidder: bidWithUser?.bidder,
         timestamp: new Date().toISOString(),
@@ -98,9 +112,7 @@ export const placeBid = async (req: AuthRequest, res: any) => {
         room?.size || 0
       );
     } else {
-      console.log("biddig not possible");
-
-      console.warn("Socket.IO instance not available");
+      console.log("Socket.IO instance not available");
     }
 
     res.status(201).json({
@@ -114,6 +126,12 @@ export const placeBid = async (req: AuthRequest, res: any) => {
 
     if (io && req.body.auctionId) {
       io.to(`auction_${req.body.auctionId}`).emit("bidError", {
+        error: "Failed to place bid",
+        auctionId: req.body.auctionId,
+        timestamp: new Date().toISOString(),
+      });
+
+      io.emit("bidError", {
         error: "Failed to place bid",
         auctionId: req.body.auctionId,
         timestamp: new Date().toISOString(),
@@ -197,7 +215,9 @@ export const acceptBid = async (req: AuthRequest, res: any) => {
     );
 
     if (io) {
-      console.log(`Emitting bidAccepted event to auction_${bid.auctionId}`);
+      console.log(
+        `Emitting global bid accepted events for auction ${bid.auctionId}`
+      );
 
       io.to(`auction_${bid.auctionId}`).emit("bidAccepted", {
         bid: {
@@ -212,9 +232,19 @@ export const acceptBid = async (req: AuthRequest, res: any) => {
 
       io.emit("auctionEnded", {
         auctionId: bid.auctionId,
+        auctionName: bid.auction?.name,
         winningBid: bid.amount,
         winner: bid.bidder,
         auctionTitle: bid.auction?.name,
+        timestamp: new Date().toISOString(),
+      });
+
+      io.emit("auctionActivity", {
+        type: "auction_ended",
+        auctionId: bid.auctionId,
+        auctionName: bid.auction?.name,
+        winningBid: bid.amount,
+        winner: bid.bidder,
         timestamp: new Date().toISOString(),
       });
     }
@@ -317,8 +347,11 @@ export const rejectBid = async (req: AuthRequest, res: any) => {
     }
 
     if (io) {
-      console.log(`Emitting bidRejected event to auction_${bid.auctionId}`);
+      console.log(
+        `Emitting global bid rejected events for auction ${bid.auctionId}`
+      );
 
+      // Emit to specific auction room
       io.to(`auction_${bid.auctionId}`).emit("bidRejected", {
         bid: {
           ...bid.toJSON(),
@@ -335,6 +368,29 @@ export const rejectBid = async (req: AuthRequest, res: any) => {
         auctionId: bid.auctionId,
         currentPrice: nextHighestBid?.amount || bid.auction?.startingPrice || 0,
         highestBidId: nextHighestBid?.id || null,
+        timestamp: new Date().toISOString(),
+      });
+
+      io.emit("bidUpdate", {
+        auctionId: bid.auctionId,
+        auctionName: bid.auction?.name,
+        currentPrice: nextHighestBid?.amount || bid.auction?.startingPrice || 0,
+        previousPrice: bid.amount,
+        bidder: nextHighestBid
+          ? { id: "system", username: "System" }
+          : { id: "system", username: "System" },
+        timestamp: new Date().toISOString(),
+        bidCount: await Bid.count({ where: { auctionId: bid.auctionId } }),
+        type: "bid_rejected",
+      });
+
+      io.emit("auctionActivity", {
+        type: "bid_rejected",
+        auctionId: bid.auctionId,
+        auctionName: bid.auction?.name,
+        rejectedBid: bid.amount,
+        newHighestBid:
+          nextHighestBid?.amount || bid.auction?.startingPrice || 0,
         timestamp: new Date().toISOString(),
       });
     }
@@ -356,10 +412,10 @@ export const rejectBid = async (req: AuthRequest, res: any) => {
 
 export const getAuctionBids = async (req: Request, res: Response) => {
   try {
-    const { auctionId } = req.params;
+    // const { auctionId } = req.params;
 
     const bids = await Bid.findAll({
-      where: { auctionId },
+      // where: { auctionId },
       include: [
         {
           model: User,
@@ -370,7 +426,7 @@ export const getAuctionBids = async (req: Request, res: Response) => {
       order: [["createdAt", "DESC"]],
     });
 
-    const currentHighestBid = await AuctionService.getHighestBid(auctionId);
+    // const currentHighestBid = await AuctionService.getHighestBid(auctionId);
 
     const pendingBids = bids.filter((bid) => bid.status === BidStatus.PENDING);
     const acceptedBids = bids.filter(
@@ -382,7 +438,6 @@ export const getAuctionBids = async (req: Request, res: Response) => {
 
     res.json({
       bids,
-      currentHighestBid,
       totalBids: bids.length,
       bidsByStatus: {
         pending: pendingBids,

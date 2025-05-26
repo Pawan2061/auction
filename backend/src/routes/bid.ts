@@ -12,4 +12,4 @@ bidRouter.post("/", authenticateToken, placeBid);
 
 bidRouter.get("/", authenticateToken, getAuctionBids);
 bidRouter.put("/accept/:bidId", authenticateToken, acceptBid);
-bidRouter.put("/reject/:id", authenticateToken, rejectBid);
+bidRouter.put("/reject/:bidId", authenticateToken, rejectBid);

@@ -54,6 +54,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useUserStore } from "@/store/user";
+import { useRouter } from "next/navigation";
 
 interface FormData {
   email: string;
@@ -82,6 +83,7 @@ const Navbar = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const { user, isAuthenticated, setUser, clearUser } = useUserStore();
 
@@ -114,6 +116,7 @@ const Navbar = () => {
       });
       setIsAuthModalOpen(false);
       setLoginData({ email: "", password: "" });
+      router.push("/auction");
     },
     onError: (err) => {
       console.error("Login Error:", err);
@@ -144,8 +147,10 @@ const Navbar = () => {
         id: res.data.user.id,
         email: res.data.user.email,
       });
+
       setIsAuthModalOpen(false);
       setSignupData({ name: "", email: "", password: "", confirmPassword: "" });
+      router.push("/auction");
     },
     onError: (err) => {
       console.error("Signup Error:", err);

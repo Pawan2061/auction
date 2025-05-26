@@ -22,6 +22,8 @@ import {
   VolumeX,
   Radio,
   X,
+  Trophy,
+  AlertCircle,
 } from "lucide-react";
 
 interface BidUpdate {
@@ -35,13 +37,32 @@ interface BidUpdate {
   };
   timestamp: string;
   bidCount: number;
-  id?: string; // Unique identifier for deduplication
+  id?: string;
+  type?: string;
+}
+
+interface AuctionActivity {
+  type: "bid_placed" | "bid_rejected" | "auction_ended";
+  auctionId: string;
+  auctionName?: string;
+  currentPrice?: number;
+  bidder?: {
+    id: string;
+    username: string;
+  };
+  winner?: {
+    id: string;
+    username: string;
+  };
+  winningBid?: number;
+  timestamp: string;
 }
 
 interface SocketStreamDialogProps {
   socketUrl?: string;
   userId?: string;
   onBidUpdate?: (update: BidUpdate) => void;
+  onAuctionActivity?: (activity: AuctionActivity) => void;
   maxStreamItems?: number;
   enableSound?: boolean;
   trigger?: React.ReactNode;
@@ -53,6 +74,7 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
   socketUrl = "http://localhost:3001",
   userId = "",
   onBidUpdate,
+  onAuctionActivity,
   maxStreamItems = 100,
   enableSound = true,
   trigger,
@@ -62,9 +84,13 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
   const [isOpen, setIsOpen] = useState(open || false);
   const [isConnected, setIsConnected] = useState(false);
   const [bidUpdates, setBidUpdates] = useState<BidUpdate[]>([]);
+  const [auctionActivities, setAuctionActivities] = useState<AuctionActivity[]>(
+    []
+  );
   const [soundEnabled, setSoundEnabled] = useState(enableSound);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [activeTab, setActiveTab] = useState<"bids" | "activities">("bids");
 
   const socketRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,7 +118,9 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
     }
   }, [soundEnabled]);
 
-  const playNotificationSound = (type: "bid" | "error" = "bid") => {
+  const playNotificationSound = (
+    type: "bid" | "error" | "auction_ended" = "bid"
+  ) => {
     if (!soundEnabled || !audioContextRef.current) return;
 
     try {
@@ -110,15 +138,19 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
       if (type === "bid") {
         oscillator.frequency.setValueAtTime(800, ctx.currentTime);
         oscillator.frequency.setValueAtTime(1000, ctx.currentTime + 0.1);
+      } else if (type === "auction_ended") {
+        oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(1200, ctx.currentTime + 0.2);
       } else {
         oscillator.frequency.setValueAtTime(400, ctx.currentTime);
       }
 
       gainNode.gain.setValueAtTime(0.05, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
 
       oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.2);
+      oscillator.stop(ctx.currentTime + 0.3);
     } catch (error) {
       console.warn("Failed to play notification sound");
     }
@@ -129,6 +161,7 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
 
     let socket: any = null;
     const processedUpdates = new Set<string>();
+    const processedActivities = new Set<string>();
 
     const connectSocket = () => {
       try {
@@ -142,15 +175,16 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
           });
 
           socket.on("connect", () => {
-            console.log("Socket connected for stream");
+            console.log("Socket connected for global stream");
             setIsConnected(true);
             setConnectionError(null);
             setConnectionAttempts(0);
             processedUpdates.clear();
+            processedActivities.clear();
           });
 
           socket.on("disconnect", () => {
-            console.log("Socket disconnected from stream");
+            console.log("Socket disconnected from global stream");
             setIsConnected(false);
             attemptReconnect();
           });
@@ -162,13 +196,14 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
             attemptReconnect();
           });
 
+          // Listen to global bid updates (no room joining required)
           socket.on("bidUpdate", (update: BidUpdate) => {
-            console.log("Received bid update in stream:", update);
+            console.log("Received global bid update:", update);
 
             const updateId = `${update.auctionId}-${update.currentPrice}-${update.bidder.id}-${update.timestamp}`;
 
             if (processedUpdates.has(updateId)) {
-              console.log("Duplicate update detected, skipping:", updateId);
+              console.log("Duplicate bid update detected, skipping:", updateId);
               return;
             }
 
@@ -193,7 +228,7 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
               );
 
               if (isDuplicate) {
-                console.log("Duplicate in state detected, skipping");
+                console.log("Duplicate bid update in state detected, skipping");
                 return prev;
               }
 
@@ -211,10 +246,65 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
             }
           });
 
+          // Listen to global auction activities
+          socket.on("auctionActivity", (activity: AuctionActivity) => {
+            console.log("Received auction activity:", activity);
+
+            const activityId = `${activity.type}-${activity.auctionId}-${activity.timestamp}`;
+
+            if (processedActivities.has(activityId)) {
+              console.log("Duplicate activity detected, skipping:", activityId);
+              return;
+            }
+
+            processedActivities.add(activityId);
+
+            setAuctionActivities((prev) => {
+              const newActivities = [activity, ...prev].slice(
+                0,
+                maxStreamItems
+              );
+              return newActivities;
+            });
+
+            if (activity.type === "auction_ended") {
+              playNotificationSound("auction_ended");
+            }
+
+            if (onAuctionActivity) {
+              onAuctionActivity(activity);
+            }
+          });
+
+          // Listen to global auction ended events
+          socket.on("auctionEnded", (data: any) => {
+            console.log("Received auction ended event:", data);
+
+            const activity: AuctionActivity = {
+              type: "auction_ended",
+              auctionId: data.auctionId,
+              auctionName: data.auctionName || data.auctionTitle,
+              winner: data.winner,
+              winningBid: data.winningBid,
+              timestamp: data.timestamp,
+            };
+
+            const activityId = `auction_ended-${data.auctionId}-${data.timestamp}`;
+
+            if (!processedActivities.has(activityId)) {
+              processedActivities.add(activityId);
+              setAuctionActivities((prev) =>
+                [activity, ...prev].slice(0, maxStreamItems)
+              );
+              playNotificationSound("auction_ended");
+            }
+          });
+
+          // Listen to global bid errors
           socket.on(
             "bidError",
             (error: { error: string; auctionId: string }) => {
-              console.error("Bid error:", error);
+              console.error("Global bid error:", error);
               playNotificationSound("error");
             }
           );
@@ -252,13 +342,23 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
         socket.disconnect();
       }
     };
-  }, [isOpen, socketUrl, onBidUpdate, maxStreamItems, connectionAttempts]);
+  }, [
+    isOpen,
+    socketUrl,
+    onBidUpdate,
+    onAuctionActivity,
+    maxStreamItems,
+    connectionAttempts,
+  ]);
 
   useEffect(() => {
-    if (scrollRef.current && bidUpdates.length > 0) {
+    if (
+      scrollRef.current &&
+      (bidUpdates.length > 0 || auctionActivities.length > 0)
+    ) {
       scrollRef.current.scrollTop = 0;
     }
-  }, [bidUpdates]);
+  }, [bidUpdates, auctionActivities, activeTab]);
 
   const handleOpenChange = (newOpen: boolean) => {
     setIsOpen(newOpen);
@@ -267,6 +367,7 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
     }
     if (!newOpen) {
       setBidUpdates([]);
+      setAuctionActivities([]);
       setConnectionError(null);
       setConnectionAttempts(0);
     }
@@ -290,10 +391,22 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
 
   const getUpdateColor = (update: BidUpdate) => {
     if (update.bidder.id === userId) return "border-l-blue-500 bg-blue-50";
+    if (update.type === "bid_rejected") return "border-l-red-500 bg-red-50";
     const priceIncrease = update.currentPrice - update.previousPrice;
     if (priceIncrease > 100) return "border-l-green-500 bg-green-50";
     if (priceIncrease > 50) return "border-l-yellow-500 bg-yellow-50";
     return "border-l-gray-300 bg-gray-50";
+  };
+
+  const getActivityColor = (activity: AuctionActivity) => {
+    switch (activity.type) {
+      case "auction_ended":
+        return "border-l-purple-500 bg-purple-50";
+      case "bid_rejected":
+        return "border-l-red-500 bg-red-50";
+      default:
+        return "border-l-green-500 bg-green-50";
+    }
   };
 
   const defaultTrigger = (
@@ -309,12 +422,12 @@ const SocketStreamDialog: React.FC<SocketStreamDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] p-0">
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0">
         <DialogHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
               <Activity className="h-6 w-6 text-red-500" />
-              Live Auction Stream
+              Global Auction Stream
               {isConnected && (
                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
               )}
