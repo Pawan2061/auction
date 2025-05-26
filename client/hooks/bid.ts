@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 export const useAcceptBid = () => {
   const queryClient = useQueryClient();
@@ -7,7 +8,7 @@ export const useAcceptBid = () => {
   return useMutation({
     mutationFn: async (bidId: string) => {
       const { data } = await axios.put(
-        `http://localhost:3000/api/v1/bid/accept//${bidId}`
+        `${API_BASE}/api/v1/bid/accept//${bidId}`
       );
       return data;
     },
@@ -24,7 +25,7 @@ export const useRejectBid = () => {
   return useMutation({
     mutationFn: async (bidId: string) => {
       const { data } = await axios.put(
-        `http://localhost:3000/api/v1/bid/reject/${bidId}`
+        `${API_BASE}/api/v1/bid/reject/${bidId}`
       );
       return data;
     },

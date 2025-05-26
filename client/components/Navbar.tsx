@@ -78,6 +78,7 @@ interface UserStore {
   setUser: (user: User) => void;
   clearUser: () => void;
 }
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 const Navbar = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -107,7 +108,7 @@ const Navbar = () => {
 
   const loginMutation = useMutation({
     mutationFn: (data: FormData) =>
-      axios.post("http://localhost:3000/api/v1/auth/login", data),
+      axios.post(`${API_BASE}/api/v1/auth/login`, data),
     onSuccess: (res) => {
       console.log("Login Success:", res.data);
       localStorage.setItem("user-token", res.data.token);
@@ -135,7 +136,7 @@ const Navbar = () => {
 
   const signupMutation = useMutation({
     mutationFn: (data: FormData) =>
-      axios.post("http://localhost:3000/api/v1/auth/signup", {
+      axios.post(`${API_BASE}/api/v1/auth/signup`, {
         username: data.name,
         email: data.email,
         password: data.password,

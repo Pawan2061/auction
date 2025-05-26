@@ -33,6 +33,7 @@ interface AuctionStore {
   removeAuction: (auctionId: string) => void;
   getUserAuctions: () => Auction[];
 }
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 export const useAuctionStore = create<AuctionStore>((set, get) => ({
   auctions: [],
@@ -46,7 +47,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     try {
       const token = localStorage.getItem("token");
 
-      const res = await axios.get("http://localhost:3000/api/v1/auction/all", {
+      const res = await axios.get(`${API_BASE}/api/v1/auction/all`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

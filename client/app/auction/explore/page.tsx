@@ -56,6 +56,7 @@ import SocketStreamComponent from "@/components/stream-socket";
 import SocketStreamDialog from "@/components/stream-socket";
 import { useAcceptBid, useRejectBid } from "@/hooks/bid";
 import { useAuctionStore } from "@/store/auction";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 interface Auction {
   id: string;
@@ -229,7 +230,7 @@ const ExploreAuctionsPage = () => {
 
   const { data, refetch } = useQuery({
     queryKey: ["auctions"],
-    queryFn: () => axios.get("http://localhost:3000/api/v1/auction/all"),
+    queryFn: () => axios.get(`${API_BASE}/api/v1/auction/all`),
     refetchInterval: 30000,
     enabled: isClient,
   });

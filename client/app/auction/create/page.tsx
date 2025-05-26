@@ -22,6 +22,8 @@ import axios from "axios";
 import { useAuctionStore } from "@/store/auction";
 import { useRouter } from "next/navigation";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
 interface AuctionFormData {
   name: string;
   description: string;
@@ -57,7 +59,7 @@ const AuctionCreationPage = () => {
   const { addAuction } = useAuctionStore();
   const { mutate: createAuction, isPending } = useMutation({
     mutationFn: (data: AuctionFormData) =>
-      axios.post("http://localhost:3000/api/v1/auction", data, {
+      axios.post(`${API_BASE}/api/v1/auction`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
