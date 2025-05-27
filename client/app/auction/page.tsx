@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Gavel, Plus, Search, TrendingUp, Clock, Users } from "lucide-react";
+import { useUserStore } from "@/store/user";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const AuctionMainPage = () => {
   const containerVariants = {
@@ -25,6 +28,16 @@ const AuctionMainPage = () => {
       },
     },
   };
+  const { user } = useUserStore();
+  const [canRender, setCanRender] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) {
+      toast.warning("Please sign up or log in to access the Auction Hub.");
+    } else {
+      setCanRender(true);
+    }
+  }, [user]);
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },

@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useRouter } from "next/navigation";
 
 const AuctionLanding = () => {
   const [activeAuctions, setActiveAuctions] = useState(12);
@@ -52,6 +53,7 @@ const AuctionLanding = () => {
   const [bidAmount, setBidAmount] = useState("");
   const [isWatching, setIsWatching] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const router = useRouter();
   const [showBidForm, setShowBidForm] = useState(false);
 
   const { scrollY } = useScroll();
@@ -226,9 +228,10 @@ const AuctionLanding = () => {
                 <Button
                   size="lg"
                   className="bg-gradient-to-r cursor-pointer from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white text-lg py-6 px-8 shadow-xl hover:shadow-2xl transition-all"
-                  onClick={() =>
-                    addNotification("Redirecting to live auctions...")
-                  }
+                  onClick={() => {
+                    router.push("/auction");
+                    // addNotification("Redirecting to live auctions...");
+                  }}
                 >
                   Join Live Auction
                   <ArrowRight className="w-5 h-5 ml-2" />
@@ -238,6 +241,9 @@ const AuctionLanding = () => {
                   size="lg"
                   variant="outline"
                   className="border-slate-300 cursor-pointer hover:border-slate-400 text-slate-700 text-lg py-6 px-8 hover:bg-slate-50 shadow-lg"
+                  onClick={() => {
+                    router.push("/auction/create");
+                  }}
                 >
                   <Play className="w-5 h-5 mr-2" />
                   Create Auction

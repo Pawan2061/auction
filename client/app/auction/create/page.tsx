@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { useAuctionStore } from "@/store/auction";
 import { useRouter } from "next/navigation";
+import { useUserStore } from "@/store/user";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
@@ -38,16 +39,28 @@ const AuctionCreationPage = () => {
     startingPrice: "",
     duration: "",
   });
+  const { user } = useUserStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Partial<AuctionFormData>>({});
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
+  const [canRender, setCanRender] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem("user-token");
     setToken(token);
   });
+
+  useEffect(() => {
+    if (!user?.id) {
+      toast.warning("Please sign up or log in to access the Auction Hub.");
+      router.push("/");
+    } else {
+      setCanRender(true);
+    }
+  }, [user]);
 
   const durationOptions = [
     { value: "2", label: "2 minutes", description: "Quick auction" },

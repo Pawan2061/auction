@@ -139,7 +139,7 @@ const ExploreAuctionsPage = () => {
       console.log(bidId, "id here");
 
       const response = await axios.put(
-        `http://localhost:3000/api/v1/bid/accept/${bidId}`,
+        `${API_BASE}/api/v1/bid/accept/${bidId}`,
         {},
         {
           headers: {
@@ -184,7 +184,7 @@ const ExploreAuctionsPage = () => {
       console.log(currentToken, "is here");
 
       const response = await axios.put(
-        `http://localhost:3000/api/v1/bid/reject/${bidId}`,
+        `${API_BASE}/api/v1/bid/reject/${bidId}`,
         {},
         {
           headers: {
@@ -250,7 +250,7 @@ const ExploreAuctionsPage = () => {
           : token;
 
       const response = await axios.post(
-        "http://localhost:3000/api/v1/bid",
+        `${API_BASE}/api/v1/bid`,
         { auctionId, amount },
         {
           headers: {
@@ -506,7 +506,7 @@ const ExploreAuctionsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <SocketStreamDialog
+      {/* <SocketStreamDialog
         socketUrl="http://localhost:3001"
         userId={user?.id}
         onBidUpdate={(update) => {
@@ -530,7 +530,7 @@ const ExploreAuctionsPage = () => {
             Live Stream
           </Button>
         }
-      />
+      /> */}
       <div className="container mx-auto px-4 py-8">
         <motion.div
           variants={containerVariants}

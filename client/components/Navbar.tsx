@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { useUserStore } from "@/store/user";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface FormData {
   email: string;
@@ -213,14 +214,16 @@ const Navbar = () => {
                   <Sparkles className="w-2 h-2 text-white" />
                 </div>
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
-                  AuctionHub
-                </h1>
-                <p className="text-xs text-slate-500 -mt-1">
-                  Real-time bidding
-                </p>
-              </div>
+              <Link href="/">
+                <div className="hidden sm:block">
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                    AuctionHub
+                  </h1>
+                  <p className="text-xs text-slate-500 -mt-1">
+                    Real-time bidding
+                  </p>
+                </div>
+              </Link>
             </motion.div>
 
             <div className="hidden md:flex items-center space-x-8">
